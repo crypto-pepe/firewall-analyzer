@@ -1,0 +1,12 @@
+kafka:
+  kafka_brokers:
+    - 'localhost:9093'
+  topics:
+    - 'some-topic'
+  fetch_min_bytes: 256
+  fetch_max_wait_time_secs: 2
+  fetch_max_bytes_per_partition: 100000
+validators: []
+forwarder_urls: []
+telemetry:
+  svc_name: "firewall-analyzer"
