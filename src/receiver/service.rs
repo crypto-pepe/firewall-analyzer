@@ -47,7 +47,7 @@ impl RequestReceiver for KafkaRequestReceiver {
         loop {
             for ms in self.c.poll().unwrap().iter() {
                 for m in ms.messages() {
-                    let req: Request = match bincode::deserialize(m.value) {
+                    let req: Request = match serde_json::from_slice(m.value) {
                         Ok(r) => r,
                         Err(e) => {
                             tracing::error!("{:?}", e);
@@ -59,9 +59,14 @@ impl RequestReceiver for KafkaRequestReceiver {
                         continue;
                     }
                 }
-                self.c.consume_messageset(ms);
+                if let Err(e) = self.c.consume_messageset(ms) {
+                    tracing::error!("{:?}", e);
+                    continue;
+                }
             }
-            self.c.commit_consumed().unwrap();
+            if let Err(e) = self.c.commit_consumed() {
+                tracing::error!("{:?}", e);
+            }
         }
     }
 }
