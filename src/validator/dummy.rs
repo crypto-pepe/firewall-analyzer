@@ -6,12 +6,12 @@ use crate::validator::Validator;
 // Dummy prints request and if dummy's idx is odd - bans ip for self idx * minutes
 pub struct Dummy {
     pub idx: u16,
+    pub ban_ttl_secs: u64,
 }
 
 impl Validator for Dummy {
     #[tracing::instrument(skip(self))]
     fn validate(&self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error> {
-        println!("{}: {:?}", self.idx, req);
         if self.idx % 2 == 1 {
             return Ok(Some(model::BanRequest {
                 target: BanTarget {
@@ -19,7 +19,7 @@ impl Validator for Dummy {
                     user_agent: None,
                 },
                 reason: format!("Validator has {} id", self.idx),
-                ttl: (self.idx * 60) as u32,
+                ttl: self.ban_ttl_secs as u32,
                 analyzer: self.name(),
             }));
         }

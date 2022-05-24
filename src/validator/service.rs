@@ -37,6 +37,7 @@ impl Service {
                 match v.validate(r.clone()) {
                     Ok(obr) => match obr {
                         Some(s) => {
+                            tracing::info!("ban: {:?}", s);
                             if let Err(e) = send.send(s).await {
                                 tracing::error!("{:?}", e)
                             }

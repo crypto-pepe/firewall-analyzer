@@ -37,12 +37,11 @@ async fn main() -> io::Result<()> {
 
     tokio::spawn(async move { krs.run(s).await });
 
-    let fw: Box<dyn ExecutorClient + Send + Sync> =
-        if cfg.dry_run {
-            Box::new(forwarder::NoopClient {})
-        } else {
-            Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
-        };
+    let fw: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
+        Box::new(forwarder::NoopClient {})
+    } else {
+        Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
+    };
 
     let fw = forwarder::service::Service::new(fw);
 

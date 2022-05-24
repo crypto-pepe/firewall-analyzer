@@ -1,6 +1,6 @@
-use crate::ExecutorClient;
 use crate::forwarder::ForwarderError;
 use crate::model::BanRequest;
+use crate::ExecutorClient;
 use async_trait::async_trait;
 
 pub struct NoopClient {}
