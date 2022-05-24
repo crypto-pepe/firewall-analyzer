@@ -37,11 +37,10 @@ async fn main() -> io::Result<()> {
 
     tokio::spawn(async move { krs.run(s).await });
 
-    tokio::spawn(async move {
-        let fw = forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder");
-        let fw = forwarder::service::Service::new(Box::new(fw));
-        fw.run(fr).await
-    });
+    let fw = forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder");
+    let fw = forwarder::service::Service::new(Box::new(fw));
+
+    tokio::spawn(async move { fw.run(fr).await });
 
     vs.run(r, fs).await;
     Ok(())
