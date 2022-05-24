@@ -1,16 +1,11 @@
-use std::fmt::Write;
-use std::time::Duration;
-
 use async_trait::async_trait;
-use kafka::{consumer, Error, producer};
-use kafka::client;
-use kafka::client::KafkaClient;
 use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
-use kafka::producer::Record;
+use kafka::Error;
+use pepe_config::kafka::consumer::Config;
 use tokio::sync::mpsc;
 
 use crate::model::Request;
-use crate::receiver::{Config, RequestReceiver};
+use crate::receiver::RequestReceiver;
 
 pub struct KafkaRequestReceiver {
     c: Consumer,
@@ -18,18 +13,14 @@ pub struct KafkaRequestReceiver {
 
 impl KafkaRequestReceiver {
     pub fn new(cfg: &Config) -> Result<Self, Error> {
-        let mut c = Consumer::from_hosts(cfg.kafka_brokers.clone())
+        let mut c = Consumer::from_hosts(cfg.brokers.clone())
             .with_fallback_offset(FetchOffset::Earliest)
-            .with_fetch_max_wait_time(Duration::from_secs(cfg.fetch_max_wait_time_secs))
-            .with_fetch_min_bytes(cfg.fetch_min_bytes)
-            .with_fetch_max_bytes_per_partition(cfg.fetch_max_bytes_per_partition)
-            .with_offset_storage(GroupOffsetStorage::Kafka);
+            .with_offset_storage(GroupOffsetStorage::Kafka)
+            .with_client_id(cfg.client_id.clone())
+            .with_group(cfg.group.clone());
 
-        if cfg.client_id.is_some() {
-            c = c.with_client_id(cfg.client_id.clone().unwrap());
-        }
-        if cfg.group.is_some() {
-            c = c.with_group(cfg.group.clone().unwrap());
+        if let Some(t) = cfg.ack_timeout {
+            c = c.with_fetch_max_wait_time(t.into());
         }
 
         for topic in &cfg.topics {
@@ -45,7 +36,14 @@ impl KafkaRequestReceiver {
 impl RequestReceiver for KafkaRequestReceiver {
     async fn run(&mut self, out: mpsc::Sender<Request>) {
         loop {
-            for ms in self.c.poll().unwrap().iter() {
+            let mss = match self.c.poll() {
+                Ok(mss) => mss,
+                Err(e) => {
+                    tracing::error!("{:?}",e);
+                    continue;
+                }
+            };
+            for ms in mss.iter() {
                 for m in ms.messages() {
                     let req: Request = match serde_json::from_slice(m.value) {
                         Ok(r) => r,

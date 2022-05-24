@@ -10,7 +10,9 @@ pub struct Service {
 
 impl Service {
     pub fn build() -> Self {
-        Service { validators: Vec::new() }
+        Service {
+            validators: Vec::new(),
+        }
     }
 
     pub fn with_validator(mut self, v: Box<dyn Validator>) -> Service {
@@ -28,18 +30,15 @@ impl Service {
                         tracing::error!("{:?}", e);
                         return;
                     }
-                }
+                },
             };
 
             for v in &self.validators {
                 match v.validate(r.clone()) {
                     Ok(obr) => match obr {
-                        Some(s) => match send.send(s).await {
-                            Err(e) => tracing::error!("{:?}", e),
-                            _ => (),
-                        }
-                        None => ()
-                    }
+                        Some(s) => if let Err(e) = send.send(s).await { tracing::error!("{:?}", e) },
+                        None => (),
+                    },
                     Err(e) => {
                         tracing::error!("{:?}", e);
                     }
@@ -48,4 +47,3 @@ impl Service {
         }
     }
 }
-

@@ -3,10 +3,8 @@ use tokio::sync::mpsc;
 
 use crate::model::Request;
 
-pub use self::config::Config;
 pub use self::service::KafkaRequestReceiver;
 
-mod config;
 mod service;
 
 #[async_trait]
