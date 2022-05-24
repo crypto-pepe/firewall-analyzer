@@ -1,0 +1,84 @@
+# Firewall-analyzer
+
+## ENVs
+
+| Name        | Required | Note                                                                     |
+|-------------|----------|--------------------------------------------------------------------------|
+| RUST_LOG    | No       | Log level. https://docs.rs/env_logger/0.9.0/env_logger/#enabling-logging |
+| CONFIG_PATH | No       | Path to the `yaml` formatted config file                                 |
+
+## Config
+
+**If `CONFIG_PATH` is not stated then `./config.yaml` will be used**
+
+
+| Name              | Type     | Default | Required | Note                                                                                        |
+|-------------------|----------|---------|----------|---------------------------------------------------------------------------------------------|
+| kafka.brokers     | []string |         | Yes      | List of kafka brokers                                                                       |
+| kafka.topics      | []string |         | Yes      | List of kafka topics with messages to analyze                                               |
+| kafka.group       | string   |         | Yes      | Kafka group for this app                                                                    |
+| kafka.client_id   | string   |         | Yes      | Kafka client id for this app                                                                |
+| forwarder.url     | string   |         | Yes      | Url for [forwarder](https://github.com/crypto-pepe/firewall/wiki/Banned-Targets#ban-target) |
+| forwarder.timeout | string   |         | No       | Timeout for requests of forwarder. Duration string                                          |
+| validators        | []object |         | Yes      | List of validator configs. See **Validators**                                               |
+| dry_run           | bool     | false   | No       | Run firewall-analyzer in dry run mode                                                       |
+
+# Validators
+
+### Dummy (testing validator)
+
+#### Config
+
+| Name    | Type   | Default | Required | Note                                   |
+|---------|--------|---------|----------|----------------------------------------|
+| idx     | int    |         | Yes      | id of validator                        |
+| ban_ttl | string | 10s     | No       | TTL for banned target. Duration string |
+
+## Writing your own validator
+
+Inside of `src/validator/` create module with your validator and implement `Validator` trait from `src/validator/mod.rs`.
+
+Inside of `src/validator/mod.rs` add your validator and its parameters to `Config` enum
+
+```rust
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Config {
+    Dummy {
+        idx: u16,
+        ban_ttl: Option<DurationString>,
+    },
+}
+```
+
+Then add creating of your validator to `get_validator`
+
+```rust
+pub fn get_validator(cfg: Config) -> impl Validator {
+    match cfg {
+        Dummy { idx, ban_ttl } => {
+            let ban_ttl_secs = match ban_ttl {
+                Some(ban_ttl) => {
+                    let dur: Duration = ban_ttl.into();
+                    dur.as_secs()
+                }
+                None => 120,
+            };
+
+            DummyValidator { idx, ban_ttl_secs }
+        }
+    }
+}
+```
+
+___
+
+Each of the configuration parameter can be overridden via the environment variable. Nested values overriding are
+supported via the '.' separator.
+
+Example:
+
+| Parameter name | Env. variable |
+|----------------|---------------|
+| some_field     | SOME_FIELD    |
+| server.port    | SERVER.PORT   |
