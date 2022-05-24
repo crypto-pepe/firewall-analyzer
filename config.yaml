@@ -4,10 +4,7 @@ kafka:
   topics:
     - 'some-topic'
   group: 'some-group'
-  fetch_min_bytes: 1
-  fetch_max_wait_time_secs: 2
-  fetch_max_bytes_per_partition: 100000
-validators: []
-forwarder_urls: []
+validators: [ ]
+forwarder_url: 'http://localhost:8001/api/bans'
 telemetry:
   svc_name: "firewall-analyzer"

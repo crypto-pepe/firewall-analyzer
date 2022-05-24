@@ -1,5 +1,4 @@
 use pepe_config::{ConfigError, FileFormat};
-
 use serde::{Deserialize, Serialize};
 
 use crate::telemetry;
@@ -7,7 +6,7 @@ use crate::telemetry;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub kafka: pepe_config::kafka::consumer::Config,
-    pub forwarder_urls: Vec<String>,
+    pub forwarder_url: String,
     pub telemetry: telemetry::Config,
     // todo
     pub validators: Vec<()>,

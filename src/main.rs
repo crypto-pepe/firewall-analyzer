@@ -37,7 +37,7 @@ async fn main() -> io::Result<()> {
     tokio::spawn(async move { krs.run(s).await });
 
     tokio::spawn(async move {
-        let fw = forwarder::ExecutorHttpClient::new("http://localhost:8001/api/bans".to_string());
+        let fw = forwarder::ExecutorHttpClient::new(cfg.forwarder_url);
         let fw = forwarder::service::Service::new(Box::new(fw));
         fw.run(fr).await
     });
