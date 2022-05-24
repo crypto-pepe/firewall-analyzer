@@ -1,5 +1,5 @@
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::model;
 use crate::validator::Validator;
@@ -36,7 +36,11 @@ impl Service {
             for v in &self.validators {
                 match v.validate(r.clone()) {
                     Ok(obr) => match obr {
-                        Some(s) => if let Err(e) = send.send(s).await { tracing::error!("{:?}", e) },
+                        Some(s) => {
+                            if let Err(e) = send.send(s).await {
+                                tracing::error!("{:?}", e)
+                            }
+                        }
                         None => (),
                     },
                     Err(e) => {

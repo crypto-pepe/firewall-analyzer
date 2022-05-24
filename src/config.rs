@@ -1,15 +1,14 @@
 use pepe_config::{ConfigError, FileFormat};
 use serde::{Deserialize, Serialize};
 
-use crate::telemetry;
+use crate::{forwarder, telemetry, validator};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub kafka: pepe_config::kafka::consumer::Config,
-    pub forwarder_url: String,
+    pub forwarder: forwarder::http_client::Config,
     pub telemetry: telemetry::Config,
-    // todo
-    pub validators: Vec<()>,
+    pub validators: Vec<validator::Config>,
 }
 
 pub const DEFAULT_CONFIG: &str = include_str!("../config.yaml");

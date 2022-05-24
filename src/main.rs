@@ -26,10 +26,11 @@ async fn main() -> io::Result<()> {
     telemetry::init_subscriber(subscriber);
 
     let mut krs = KafkaRequestReceiver::new(&cfg.kafka).expect("kafka request receiver");
-    let vs = validator::service::Service::build()
-        .with_validator(Box::new(validator::dummy::Dummy { idx: 1 }))
-        .with_validator(Box::new(validator::dummy::Dummy { idx: 2 }))
-        .with_validator(Box::new(validator::dummy::Dummy { idx: 3 }));
+    let mut vs = validator::service::Service::build();
+
+    for v in cfg.validators {
+        vs = vs.with_validator(Box::new(validator::get_validator(v)));
+    }
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
@@ -37,7 +38,7 @@ async fn main() -> io::Result<()> {
     tokio::spawn(async move { krs.run(s).await });
 
     tokio::spawn(async move {
-        let fw = forwarder::ExecutorHttpClient::new(cfg.forwarder_url);
+        let fw = forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder");
         let fw = forwarder::service::Service::new(Box::new(fw));
         fw.run(fr).await
     });

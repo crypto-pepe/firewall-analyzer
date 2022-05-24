@@ -22,7 +22,6 @@ pub struct BanRequest {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
 pub struct BanTarget {
     pub ip: Option<String>,
     pub user_agent: Option<String>,

@@ -39,7 +39,7 @@ impl RequestReceiver for KafkaRequestReceiver {
             let mss = match self.c.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
-                    tracing::error!("{:?}",e);
+                    tracing::error!("{:?}", e);
                     continue;
                 }
             };

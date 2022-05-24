@@ -2,6 +2,7 @@ use crate::model;
 use crate::model::{BanTarget, Request};
 use crate::validator::Validator;
 
+// USE ONLY FOR TESTING
 // Dummy prints request and if dummy's idx is odd - bans ip for self idx * minutes
 pub struct Dummy {
     pub idx: u16,

@@ -4,7 +4,15 @@ kafka:
   topics:
     - 'some-topic'
   group: 'some-group'
-validators: [ ]
-forwarder_url: 'http://localhost:8001/api/bans'
+  client_id: 'some-client'
+forwarder:
+  url: "http://localhost:8001/api/bans"
+validators:
+  - dummy:
+      idx: 0
+  - dummy:
+      idx: 1
+  - dummy:
+      idx: 2
 telemetry:
   svc_name: "firewall-analyzer"
