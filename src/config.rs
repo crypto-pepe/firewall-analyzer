@@ -9,6 +9,8 @@ pub struct Config {
     pub forwarder: forwarder::http_client::Config,
     pub telemetry: telemetry::Config,
     pub validators: Vec<validator::Config>,
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 pub const DEFAULT_CONFIG: &str = include_str!("../config.yaml");
