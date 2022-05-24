@@ -37,6 +37,7 @@ impl ExecutorHttpClient {
 
 #[async_trait]
 impl ExecutorClient for ExecutorHttpClient {
+    #[tracing::instrument(skip(self))]
     async fn send_ban_request(&self, br: BanRequest) -> Result<(), ForwarderError> {
         let res = self
             .cli

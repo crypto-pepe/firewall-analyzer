@@ -9,6 +9,7 @@ pub struct Dummy {
 }
 
 impl Validator for Dummy {
+    #[tracing::instrument(skip(self))]
     fn validate(&self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error> {
         println!("{}: {:?}", self.idx, req);
         if self.idx % 2 == 1 {
