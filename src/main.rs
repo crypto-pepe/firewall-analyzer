@@ -29,7 +29,7 @@ async fn main() -> io::Result<()> {
     let mut vs = validator::service::Service::build();
 
     for v in cfg.validators {
-        vs = vs.with_validator(Box::new(validator::get_validator(v)));
+        vs = vs.with_validator(validator::get_validator(v));
     }
 
     let (s, r) = mpsc::channel(5);

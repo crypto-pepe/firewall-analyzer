@@ -20,7 +20,11 @@ impl Service {
         self
     }
 
-    pub async fn run(&self, mut recv: Receiver<model::Request>, send: Sender<model::BanRequest>) {
+    pub async fn run(
+        &mut self,
+        mut recv: Receiver<model::Request>,
+        send: Sender<model::BanRequest>,
+    ) {
         loop {
             let r = match recv.try_recv() {
                 Ok(r) => r,
@@ -33,7 +37,7 @@ impl Service {
                 },
             };
 
-            for v in &self.validators {
+            for v in &mut self.validators {
                 match v.validate(r.clone()) {
                     Ok(obr) => match obr {
                         Some(s) => {
