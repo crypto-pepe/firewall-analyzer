@@ -64,7 +64,6 @@ impl IPCount {
 }
 
 impl Validator for IPCount {
-    // todo refactor
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
         let mut data = self.ip_data.entry(ip.clone()).or_insert(Data::default());
@@ -72,10 +71,9 @@ impl Validator for IPCount {
 
         let rule_idx = self.rules.binary_search_by(|r| r.limit.cmp(&data.count));
 
-        // first possibly applicable rule
         let rule = match rule_idx {
-            Ok(idx) => self.rules.get(idx),
-            Err(_) => return Ok(None),
+            Ok(idx) => self.rules.get(idx), // Rule for exact count
+            Err(_) => return Ok(None), // Ignore any other case
         }
         .expect("no rules set");
 
@@ -240,9 +238,10 @@ mod tests {
             input: vec![
                 (req_with_ip("1.1.1.1"), Duration::seconds(0)),
                 (req_with_ip("1.1.1.1"), Duration::seconds(2)),
+                (req_with_ip("1.1.1.1"), Duration::seconds(2)),
             ],
             want_last: Some(Ok(None)),
-            want_every: Some(vec![None, None]),
+            want_every: Some(vec![None, None, None]),
         };
 
         let mut results = vec![];
@@ -395,6 +394,76 @@ mod tests {
                     ttl: 1,
                     analyzer: "ip_count".to_string(),
                 }),
+            ]),
+        };
+
+        let mut results = vec![];
+        let mut v = get_default_validator();
+        for (req, dur) in tc.input {
+            std::thread::sleep(dur.to_std().unwrap());
+            if let Ok(r) = v.validate(req) {
+                results.push(r);
+            }
+        }
+
+        assert!(tc.want_every.is_some() || tc.want_last.is_some());
+
+        if let Some(ev) = tc.want_every {
+            assert_eq!(ev, results)
+        }
+        if let Some(Ok(ev)) = tc.want_last {
+            let res = results.pop().unwrap();
+            assert_eq!(ev, res)
+        }
+    }
+
+    #[test]
+    fn reset_one_ip_doesnt_resets_other_ip() {
+        let tc = TestCase {
+            input: vec![
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // None
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // still banned for 1s, 2s resets
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // still banned for 1s, 2s resets
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // still banned for 1s, 2s resets
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // banned for 3s, 6s reset
+                (req_with_ip("2.2.2.2"), Duration::seconds(0)), // None
+                (req_with_ip("2.2.2.2"), Duration::seconds(0)), // banned for 1s, 2s reset
+                (req_with_ip("2.2.2.2"), Duration::seconds(2)), // currently unbanned
+            ],
+            want_last: None,
+            want_every: Some(vec![
+                None,
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 1,
+                    analyzer: "ip_count".to_string(),
+                }),
+                None,
+                None,
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 3,
+                    analyzer: "ip_count".to_string(),
+                }),
+                None,
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("2.2.2.2".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 1,
+                    analyzer: "ip_count".to_string(),
+                }),
+                None,
             ]),
         };
 
