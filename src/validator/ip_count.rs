@@ -147,7 +147,7 @@ mod tests {
     use crate::validator::ip_count::{BanRule, IPCount};
     use crate::validator::Validator;
 
-    /// get_default_validator returns IPCount with
+    /// `get_default_validator` returns `IPCount` with
     /// next limits:
     ///
     /// 3 -> 1s ban, 2s reset
@@ -217,23 +217,7 @@ mod tests {
             want_every: None,
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -244,23 +228,7 @@ mod tests {
             want_every: None,
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -275,23 +243,7 @@ mod tests {
             want_every: Some(vec![None, None, None]),
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -308,23 +260,7 @@ mod tests {
             want_every: Some(vec![None, None, None, None, None]),
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -353,23 +289,7 @@ mod tests {
             ]),
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -408,24 +328,7 @@ mod tests {
             ]),
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -468,24 +371,7 @@ mod tests {
             ]),
         };
 
-        let mut results = vec![];
-        let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
-            if let Ok(r) = v.validate(req) {
-                results.push(r);
-            }
-        }
-
-        assert!(tc.want_every.is_some() || tc.want_last.is_some());
-
-        if let Some(ev) = tc.want_every {
-            assert_eq!(ev, results)
-        }
-        if let Some(Ok(ev)) = tc.want_last {
-            let res = results.pop().unwrap();
-            assert_eq!(ev, res)
-        }
+        run_test(tc);
     }
 
     #[test]
@@ -526,6 +412,69 @@ mod tests {
             ]),
         };
 
+        run_test(tc)
+    }
+
+    #[test]
+    fn same_ban_after_exceed_last_limit_again() {
+        let tc = TestCase {
+            input: vec![
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)),
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)),
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // 1st
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), //
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // 2nd
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // 3rd
+                (req_with_ip("1.1.1.1"), Duration::seconds(0)), // 4th
+            ],
+            want_last: None,
+            want_every: Some(vec![
+                None,
+                None,
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 1,
+                    analyzer: "ip_count".to_string(),
+                }),
+                None,
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 3,
+                    analyzer: "ip_count".to_string(),
+                }),
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 4,
+                    analyzer: "ip_count".to_string(),
+                }),
+                Some(BanRequest {
+                    target: BanTarget {
+                        ip: Some("1.1.1.1".to_string()),
+                        user_agent: None,
+                    },
+                    reason: "".to_string(),
+                    ttl: 4,
+                    analyzer: "ip_count".to_string(),
+                }),
+            ]),
+        };
+
+        run_test(tc);
+    }
+
+    fn run_test(tc: TestCase) {
         let mut results = vec![];
         let mut v = get_default_validator();
         for (req, dur) in tc.input {
