@@ -3,59 +3,17 @@ use std::collections::HashMap;
 
 use anyhow::Error;
 use chrono::prelude::*;
-use circular_queue::CircularQueue;
-use serde::{Deserialize, Serialize};
+
+use super::data::Data;
 
 use crate::model::{BanRequest, BanTarget, Request};
+use crate::validator::ip_count::{BanRule, BanRuleConfig};
 use crate::validator::Validator;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct BanRuleConfig {
-    pub limit: u64,
-    pub ban_duration: duration_string::DurationString,
-    pub reset_duration: duration_string::DurationString,
-}
-
-pub struct BanRule {
-    pub limit: u64,
-    pub ban_duration: chrono::Duration,
-    pub reset_duration: chrono::Duration,
-}
-
-impl From<BanRuleConfig> for BanRule {
-    fn from(brc: BanRuleConfig) -> Self {
-        BanRule {
-            limit: brc.limit,
-            ban_duration: chrono::Duration::from_std(brc.ban_duration.into()).unwrap(),
-            reset_duration: chrono::Duration::from_std(brc.reset_duration.into()).unwrap(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Data {
-    requests_since_last_ban: u64,
-    applied_rule_id: Option<usize>,
-    recent_requests: CircularQueue<DateTime<Utc>>,
-    resets_at: DateTime<Utc>,
-}
-
-impl Data {
-    fn new(requests_limit: usize) -> Self {
-        Data {
-            requests_since_last_ban: 0,
-            applied_rule_id: None,
-            recent_requests: CircularQueue::with_capacity(requests_limit),
-            resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
-        }
-    }
-}
-
 pub struct IPCount {
-    pub ban_desc: String,
-    pub rules: Vec<BanRule>,
-    pub ip_data: HashMap<String, Data>,
+    ban_desc: String,
+    rules: Vec<BanRule>,
+    ip_data: HashMap<String, Data>,
 }
 
 impl IPCount {
@@ -75,18 +33,25 @@ impl IPCount {
                 user_agent: None,
             },
             reason: self.ban_desc.clone(),
-            ttl: self.rules.get(rule_idx).expect(&*format!("rule {} not found", rule_idx)).ban_duration.num_seconds() as u32,
+            ttl: self
+                .rules
+                .get(rule_idx)
+                .expect(&*format!("rule {} not found", rule_idx))
+                .ban_duration
+                .num_seconds() as u32,
             analyzer: self.name(),
         }
     }
 }
 
 impl Validator for IPCount {
-    // todo refactor
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
         let rule = self.rules.get(0).expect("at least one rule required");
-        let mut data = self.ip_data.entry(ip.clone()).or_insert(Data::new(rule.limit as usize));
+        let mut data = self
+            .ip_data
+            .entry(ip.clone())
+            .or_insert(Data::new(rule.limit as usize));
 
         let now = Utc::now();
 
@@ -108,25 +73,20 @@ impl Validator for IPCount {
             return Ok(Some(self.ban(0, ip)));
         }
 
-        //  was banned
+        // was banned
 
-        // if that ban should be reset
-        if data.resets_at <= Utc::now() && data.applied_rule_id.is_some() {
-            data.recent_requests.push(now.clone());
-            data.applied_rule_id = None;
+        if data.should_reset_timeout() {
+            data.reset(now);
             return Ok(None);
         }
 
         data.requests_since_last_ban += 1;
 
-        let rule_idx = data.applied_rule_id.map_or(0, |v| min(v + 1, self.rules.len() - 1));
-        let rule = self.rules.get(rule_idx).expect(&*format!("rule {} not found", rule_idx));
+        let rule_idx = data
+            .applied_rule_id
+            .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if data.requests_since_last_ban >= rule.limit {
-            data.resets_at = now + rule.reset_duration;
-            data.requests_since_last_ban = 0;
-            data.applied_rule_id = Some(rule_idx + 1);
-
+        if data.try_apply_rule(&self.rules, rule_idx, now) {
             return Ok(Some(self.ban(rule_idx, ip)));
         }
 

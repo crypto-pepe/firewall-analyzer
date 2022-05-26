@@ -1,0 +1,49 @@
+use crate::validator::ip_count::BanRule;
+use chrono::{DateTime, NaiveDateTime, Utc};
+use circular_queue::CircularQueue;
+
+#[derive(Debug)]
+pub struct Data {
+    pub(crate) requests_since_last_ban: u64,
+    pub(crate) applied_rule_id: Option<usize>,
+    pub(crate) recent_requests: CircularQueue<DateTime<Utc>>,
+    pub(crate) resets_at: DateTime<Utc>,
+}
+
+impl Data {
+    pub fn new(requests_limit: usize) -> Self {
+        Data {
+            requests_since_last_ban: 0,
+            applied_rule_id: None,
+            recent_requests: CircularQueue::with_capacity(requests_limit),
+            resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+        }
+    }
+
+    pub fn should_reset_timeout(&self) -> bool {
+        self.resets_at <= Utc::now() && self.applied_rule_id.is_some()
+    }
+
+    pub fn reset(&mut self, last_request_time: DateTime<Utc>) {
+        self.recent_requests.push(last_request_time);
+        self.applied_rule_id = None;
+    }
+
+    pub fn try_apply_rule(
+        &mut self,
+        rules: &Vec<BanRule>,
+        rule_idx: usize,
+        last_request_time: DateTime<Utc>,
+    ) -> bool {
+        let rule = rules
+            .get(rule_idx)
+            .expect(&*format!("rule {} not found", rule_idx));
+        if self.requests_since_last_ban >= rule.limit {
+            self.resets_at = last_request_time + rule.reset_duration;
+            self.requests_since_last_ban = 0;
+            self.applied_rule_id = Some(rule_idx + 1);
+            return true;
+        }
+        false
+    }
+}
