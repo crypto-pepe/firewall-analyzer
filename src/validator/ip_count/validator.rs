@@ -26,6 +26,7 @@ impl IPCount {
         }
     }
 
+    #[tracing::instrument(skip(self, rule_idx))]
     fn ban(&self, rule_idx: usize, ip: String) -> BanRequest {
         BanRequest {
             target: BanTarget {
@@ -45,6 +46,8 @@ impl IPCount {
 }
 
 impl Validator for IPCount {
+
+    #[tracing::instrument(skip(self))]
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
         let rule = self.rules.get(0).expect("at least one rule required");
@@ -70,6 +73,8 @@ impl Validator for IPCount {
             data.requests_since_last_ban = 0;
             data.applied_rule_id = Some(0);
 
+            let rule = self.rules[0];
+            tracing::info!(ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
             return Ok(Some(self.ban(0, ip)));
         }
 
@@ -77,6 +82,7 @@ impl Validator for IPCount {
 
         if data.should_reset_timeout() {
             data.reset(now);
+            tracing::info!(ip = ip.as_str());
             return Ok(None);
         }
 

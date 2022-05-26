@@ -8,6 +8,7 @@ pub struct BanRuleConfig {
     pub reset_duration: duration_string::DurationString,
 }
 
+#[derive(Copy, Clone)]
 pub struct BanRule {
     pub limit: u64,
     pub ban_duration: chrono::Duration,
