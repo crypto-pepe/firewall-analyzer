@@ -3,11 +3,11 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use circular_queue::CircularQueue;
 
 #[derive(Debug)]
-pub struct Data {
-    pub(crate) requests_since_last_ban: u64,
-    pub(crate) applied_rule_id: Option<usize>,
-    pub(crate) recent_requests: CircularQueue<DateTime<Utc>>,
-    pub(crate) resets_at: DateTime<Utc>,
+pub(crate) struct Data {
+    pub requests_since_last_ban: u64,
+    pub applied_rule_id: Option<usize>,
+    pub recent_requests: CircularQueue<DateTime<Utc>>,
+    pub resets_at: DateTime<Utc>,
 }
 
 impl Data {
@@ -31,7 +31,7 @@ impl Data {
 
     pub fn try_apply_rule(
         &mut self,
-        rules: &Vec<BanRule>,
+        rules: &[BanRule],
         rule_idx: usize,
         last_request_time: DateTime<Utc>,
     ) -> bool {

@@ -51,13 +51,13 @@ impl Validator for IPCount {
         let mut data = self
             .ip_data
             .entry(ip.clone())
-            .or_insert(Data::new(rule.limit as usize));
+            .or_insert_with(|| Data::new(rule.limit as usize));
 
         let now = Utc::now();
 
         // No ban now
         if data.applied_rule_id.is_none() {
-            data.recent_requests.push(now.clone());
+            data.recent_requests.push(now);
             if !data.recent_requests.is_full() {
                 return Ok(None);
             }
@@ -140,8 +140,8 @@ mod tests {
     }
 
     pub struct TestCase {
-        pub input: Vec<(Request, Duration)>,
         //request, sleep before request
+        pub input: Vec<(Request, Duration)>,
         pub want_last: Option<Result<Option<BanRequest>, Error>>,
         pub want_every: Option<Vec<Option<BanRequest>>>,
     }
