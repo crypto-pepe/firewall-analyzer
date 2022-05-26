@@ -1,7 +1,9 @@
+use std::cmp::min;
 use std::collections::HashMap;
 
 use anyhow::Error;
 use chrono::prelude::*;
+use circular_queue::CircularQueue;
 use serde::{Deserialize, Serialize};
 
 use crate::model::{BanRequest, BanTarget, Request};
@@ -35,18 +37,16 @@ impl From<BanRuleConfig> for BanRule {
 pub struct Data {
     requests_since_last_ban: u64,
     applied_rule_id: Option<usize>,
-    recent_requests: Vec<DateTime<Utc>>,
-    banned_since: DateTime<Utc>,
+    recent_requests: CircularQueue<DateTime<Utc>>,
     resets_at: DateTime<Utc>,
 }
 
-impl Default for Data {
-    fn default() -> Self {
+impl Data {
+    fn new(requests_limit: usize) -> Self {
         Data {
             requests_since_last_ban: 0,
             applied_rule_id: None,
-            recent_requests: vec![],
-            banned_since: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
+            recent_requests: CircularQueue::with_capacity(requests_limit),
             resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
         }
     }
@@ -68,63 +68,66 @@ impl IPCount {
         }
     }
 
-    fn ban_by_ip(&self, rule_idx: usize, ip: String) -> BanRequest {
+    fn ban(&self, rule_idx: usize, ip: String) -> BanRequest {
         BanRequest {
             target: BanTarget {
                 ip: Some(ip),
                 user_agent: None,
             },
             reason: self.ban_desc.clone(),
-            ttl: self.rules.get(rule_idx).expect("rule not found").ban_duration.num_seconds() as u32,
+            ttl: self.rules.get(rule_idx).expect(&*format!("rule {} not found", rule_idx)).ban_duration.num_seconds() as u32,
             analyzer: self.name(),
         }
     }
 }
 
 impl Validator for IPCount {
+    // todo refactor
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
-        let mut data = self.ip_data.entry(ip.clone()).or_insert(Data::default());
+        let rule = self.rules.get(0).expect("at least one rule required");
+        let mut data = self.ip_data.entry(ip.clone()).or_insert(Data::new(rule.limit as usize));
 
         let now = Utc::now();
-        data.recent_requests.push(now.clone());
 
         // No ban now
         if data.applied_rule_id.is_none() {
-            let rule = self.rules.get(0).expect("at least one rule required");
-            data.recent_requests.retain(|r| *r > now - rule.reset_duration);
-            if data.recent_requests.len() < rule.limit as usize { // limits are ok
+            data.recent_requests.push(now.clone());
+            if !data.recent_requests.is_full() {
                 return Ok(None);
             }
+            if *data.recent_requests.iter().last().unwrap() <= now - rule.reset_duration {
+                return Ok(None);
+            }
+
             data.resets_at = Utc::now() + rule.reset_duration;
             data.recent_requests.clear();
             data.requests_since_last_ban = 0;
             data.applied_rule_id = Some(0);
 
-            return Ok(Some(self.ban_by_ip(0, ip)));
+            return Ok(Some(self.ban(0, ip)));
         }
 
         //  was banned
 
         // if that ban should be reset
         if data.resets_at <= Utc::now() && data.applied_rule_id.is_some() {
+            data.recent_requests.push(now.clone());
             data.applied_rule_id = None;
             return Ok(None);
         }
 
         data.requests_since_last_ban += 1;
 
-        // current limit; possibly was banned with previous rule
-        let rule_idx = data.applied_rule_id.map_or(0, |v| v + 1);
-        let rule = self.rules.get(rule_idx).expect("rule not found");
+        let rule_idx = data.applied_rule_id.map_or(0, |v| min(v + 1, self.rules.len() - 1));
+        let rule = self.rules.get(rule_idx).expect(&*format!("rule {} not found", rule_idx));
 
         if data.requests_since_last_ban >= rule.limit {
-            data.banned_since = Utc::now();
-            data.resets_at = data.banned_since + rule.reset_duration;
+            data.resets_at = now + rule.reset_duration;
             data.requests_since_last_ban = 0;
             data.applied_rule_id = Some(rule_idx + 1);
 
-            return Ok(Some(self.ban_by_ip(rule_idx, ip)));
+            return Ok(Some(self.ban(rule_idx, ip)));
         }
 
         Ok(None)
