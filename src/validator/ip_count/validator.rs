@@ -74,7 +74,7 @@ impl Validator for IPCount {
             data.applied_rule_id = Some(0);
 
             let rule = self.rules[0];
-            tracing::info!(ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
+            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
             return Ok(Some(self.ban(0, ip)));
         }
 
@@ -82,7 +82,7 @@ impl Validator for IPCount {
 
         if data.should_reset_timeout() {
             data.reset(now);
-            tracing::info!(ip = ip.as_str());
+            tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
         }
 
@@ -93,6 +93,8 @@ impl Validator for IPCount {
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
         if data.try_apply_rule(&self.rules, rule_idx, now) {
+            let rule = self.rules[rule_idx];
+            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
             return Ok(Some(self.ban(rule_idx, ip)));
         }
 
