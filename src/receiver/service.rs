@@ -45,16 +45,18 @@ impl RequestReceiver for KafkaRequestReceiver {
             };
             for ms in mss.iter() {
                 for m in ms.messages() {
-                    let req: Request = match serde_json::from_slice(m.value) {
+                    let reqs: Vec<Request> = match serde_json::from_slice(m.value) {
                         Ok(r) => r,
                         Err(e) => {
                             tracing::error!("{:?}", e);
                             continue;
                         }
                     };
-                    if let Err(e) = out.send(req).await {
-                        tracing::error!("{:?}", e);
-                        continue;
+                    for req in reqs {
+                        if let Err(e) = out.send(req).await {
+                            tracing::error!("{:?}", e);
+                            continue;
+                        }
                     }
                 }
                 if let Err(e) = self.c.consume_messageset(ms) {
