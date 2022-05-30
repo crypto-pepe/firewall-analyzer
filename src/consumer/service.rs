@@ -4,8 +4,8 @@ use kafka::Error;
 use pepe_config::kafka::consumer::Config;
 use tokio::sync::mpsc;
 
-use crate::model::Request;
 use crate::consumer::RequestConsumer;
+use crate::model::Request;
 
 pub struct KafkaRequestConsumer {
     c: Consumer,

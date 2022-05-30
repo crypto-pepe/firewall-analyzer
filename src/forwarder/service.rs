@@ -16,7 +16,6 @@ impl Service {
     pub async fn run(&self, mut recv: Receiver<BanRequest>) {
         loop {
             match recv.try_recv() {
-                // todo maybe blocking receive and inside of select?
                 Ok(s) => {
                     if let Err(e) = self.client.ban(s).await {
                         tracing::error!("{:?}", e)

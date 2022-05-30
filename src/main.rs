@@ -1,13 +1,14 @@
 use tokio::io;
 use tokio::sync::mpsc;
 
-use crate::forwarder::ExecutorClient;
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
+use crate::forwarder::ExecutorClient;
 
 mod config;
+mod consumer;
+mod error;
 mod forwarder;
 mod model;
-mod consumer;
 mod telemetry;
 mod validator;
 
@@ -25,7 +26,8 @@ async fn main() -> io::Result<()> {
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
 
-    let mut kafka_request_consumer = KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
+    let mut kafka_request_consumer =
+        KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
     let mut validator_svc = validator::service::Service::build();
 
     for v in cfg.validators {
@@ -35,7 +37,7 @@ async fn main() -> io::Result<()> {
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
 
-    tokio::spawn(async move { krs.run(s).await });
+    let request_consumer_fut = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 
     let fw: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
@@ -43,10 +45,17 @@ async fn main() -> io::Result<()> {
         Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
     };
 
-    let fw = forwarder::service::Service::new(fw);
+    let forwarder_svc = forwarder::service::Service::new(fw);
 
-    tokio::spawn(async move { fw.run(fr).await });
+    let forwarder_fut = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
-    vs.run(r, fs).await;
+    let validator_fut = tokio::spawn(async move { validator_svc.run(r, fs).await });
+
+    if let Err(e) =
+        futures::future::try_join3(request_consumer_fut, forwarder_fut, validator_fut).await
+    {
+        panic!("{:?}", e)
+    }
+
     Ok(())
 }
