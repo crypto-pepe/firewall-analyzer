@@ -5,7 +5,7 @@ use pepe_config::kafka::consumer::Config;
 use tokio::sync::mpsc;
 
 use crate::model::Request;
-use crate::receiver::RequestConsumer;
+use crate::consumer::RequestConsumer;
 
 pub struct KafkaRequestConsumer {
     c: Consumer,
@@ -34,7 +34,7 @@ impl KafkaRequestConsumer {
 
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) {
+    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), anyhow::Error> {
         loop {
             let mss = match self.c.poll() {
                 Ok(mss) => mss,
@@ -55,7 +55,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                     for req in reqs {
                         if let Err(e) = out.send(req).await {
                             tracing::error!("{:?}", e);
-                            continue;
+                            return Err(anyhow::Error::from(e));
                         }
                     }
                 }

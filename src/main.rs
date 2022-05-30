@@ -2,12 +2,12 @@ use tokio::io;
 use tokio::sync::mpsc;
 
 use crate::forwarder::ExecutorClient;
-use crate::receiver::{KafkaRequestConsumer, RequestConsumer};
+use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 
 mod config;
 mod forwarder;
 mod model;
-mod receiver;
+mod consumer;
 mod telemetry;
 mod validator;
 
@@ -25,11 +25,11 @@ async fn main() -> io::Result<()> {
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
 
-    let mut krs = KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request receiver");
-    let mut vs = validator::service::Service::build();
+    let mut kafka_request_consumer = KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
+    let mut validator_svc = validator::service::Service::build();
 
     for v in cfg.validators {
-        vs = vs.with_validator(Box::new(validator::get_validator(v)));
+        validator_svc = validator_svc.with_validator(Box::new(validator::get_validator(v)));
     }
 
     let (s, r) = mpsc::channel(5);
