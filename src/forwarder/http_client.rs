@@ -10,7 +10,7 @@ use crate::ExecutorClient;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
-    url: String,
+    ban_target_url: String,
     timeout: Option<DurationString>,
 }
 
@@ -29,7 +29,7 @@ impl ExecutorHttpClient {
             .build()
             .map_err(|e| ForwarderError::NewForwarder(e.to_string()))?;
         Ok(ExecutorHttpClient {
-            url: cfg.url.clone(),
+            url: cfg.ban_target_url.clone(),
             client: cli,
         })
     }
