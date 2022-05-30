@@ -1,5 +1,6 @@
-use tokio::sync::mpsc::error::TryRecvError;
+use anyhow::anyhow;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::error::TryRecvError;
 
 use crate::model;
 use crate::validator::Validator;
@@ -20,15 +21,15 @@ impl Service {
         self
     }
 
-    pub async fn run(&self, mut recv: Receiver<model::Request>, send: Sender<model::BanRequest>) {
-        loop {
+    pub async fn run(&self, mut recv: Receiver<model::Request>, send: Sender<model::BanRequest>) -> Result<(), anyhow::Error> {
+        'inf: loop {
             let r = match recv.try_recv() {
                 Ok(r) => r,
                 Err(e) => match e {
                     TryRecvError::Empty => continue,
                     TryRecvError::Disconnected => {
                         tracing::error!("{:?}", e);
-                        return;
+                        return Err(anyhow::Error::from(e));
                     }
                 },
             };
@@ -39,7 +40,8 @@ impl Service {
                         Some(s) => {
                             tracing::info!("ban: {:?}", s);
                             if let Err(e) = send.send(s).await {
-                                tracing::error!("{:?}", e)
+                                tracing::error!("{:?}", e);
+                                return Err(anyhow::Error::from(e));
                             }
                         }
                         None => (),

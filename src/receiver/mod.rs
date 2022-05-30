@@ -3,11 +3,11 @@ use tokio::sync::mpsc;
 
 use crate::model::Request;
 
-pub use self::service::KafkaRequestReceiver;
+pub use self::service::KafkaRequestConsumer;
 
 mod service;
 
 #[async_trait]
-pub trait RequestReceiver {
+pub trait RequestConsumer {
     async fn run(&mut self, out: mpsc::Sender<Request>);
 }

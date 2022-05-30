@@ -16,7 +16,7 @@ pub struct Config {
 
 pub struct ExecutorHttpClient {
     url: String,
-    cli: reqwest::Client,
+    client: reqwest::Client,
 }
 
 impl ExecutorHttpClient {
@@ -30,7 +30,7 @@ impl ExecutorHttpClient {
             .map_err(|e| ForwarderError::NewForwarder(e.to_string()))?;
         Ok(ExecutorHttpClient {
             url: cfg.url.clone(),
-            cli,
+            client: cli,
         })
     }
 }
@@ -38,9 +38,9 @@ impl ExecutorHttpClient {
 #[async_trait]
 impl ExecutorClient for ExecutorHttpClient {
     #[tracing::instrument(skip(self))]
-    async fn send_ban_request(&self, br: BanRequest) -> Result<(), ForwarderError> {
+    async fn ban(&self, br: BanRequest) -> Result<(), ForwarderError> {
         let res = self
-            .cli
+            .client
             .post(self.url.clone())
             // BanRequest derives Serialize
             .body(serde_json::to_vec(&br).expect("BanRequest to vec"))

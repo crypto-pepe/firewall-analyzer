@@ -17,7 +17,7 @@ pub const APPLICATION_JSON: &str = "application/json";
 
 #[async_trait]
 pub trait ExecutorClient {
-    async fn send_ban_request(&self, br: BanRequest) -> Result<(), ForwarderError>;
+    async fn ban(&self, br: BanRequest) -> Result<(), ForwarderError>;
 }
 
 #[derive(Error, Debug)]

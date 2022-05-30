@@ -5,13 +5,13 @@ use pepe_config::kafka::consumer::Config;
 use tokio::sync::mpsc;
 
 use crate::model::Request;
-use crate::receiver::RequestReceiver;
+use crate::receiver::RequestConsumer;
 
-pub struct KafkaRequestReceiver {
+pub struct KafkaRequestConsumer {
     c: Consumer,
 }
 
-impl KafkaRequestReceiver {
+impl KafkaRequestConsumer {
     pub fn new(cfg: &Config) -> Result<Self, Error> {
         let mut c = Consumer::from_hosts(cfg.brokers.clone())
             .with_fallback_offset(FetchOffset::Earliest)
@@ -28,12 +28,12 @@ impl KafkaRequestReceiver {
         }
 
         let c = c.create()?;
-        Ok(KafkaRequestReceiver { c })
+        Ok(KafkaRequestConsumer { c })
     }
 }
 
 #[async_trait]
-impl RequestReceiver for KafkaRequestReceiver {
+impl RequestConsumer for KafkaRequestConsumer {
     async fn run(&mut self, out: mpsc::Sender<Request>) {
         loop {
             let mss = match self.c.poll() {

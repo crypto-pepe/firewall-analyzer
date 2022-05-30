@@ -2,7 +2,7 @@ use tokio::io;
 use tokio::sync::mpsc;
 
 use crate::forwarder::ExecutorClient;
-use crate::receiver::{KafkaRequestReceiver, RequestReceiver};
+use crate::receiver::{KafkaRequestConsumer, RequestConsumer};
 
 mod config;
 mod forwarder;
@@ -25,7 +25,7 @@ async fn main() -> io::Result<()> {
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
 
-    let mut krs = KafkaRequestReceiver::new(&cfg.kafka).expect("kafka request receiver");
+    let mut krs = KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request receiver");
     let mut vs = validator::service::Service::build();
 
     for v in cfg.validators {
