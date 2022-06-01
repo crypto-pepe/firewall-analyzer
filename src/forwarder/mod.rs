@@ -13,7 +13,6 @@ pub mod noop_client;
 pub mod service;
 
 pub const ANALYZER_HEADER: &str = "X-Analyzer-Id";
-pub const APPLICATION_JSON: &str = "application/json";
 
 #[async_trait]
 pub trait ExecutorClient {

@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use pepe_config::DurationString;
-use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::forwarder::{ForwarderError, ANALYZER_HEADER, APPLICATION_JSON};
+use crate::forwarder::{ForwarderError, ANALYZER_HEADER};
 use crate::model::BanRequest;
 use crate::ExecutorClient;
 
@@ -42,10 +41,8 @@ impl ExecutorClient for ExecutorHttpClient {
         let res = self
             .client
             .post(self.url.clone())
-            // BanRequest derives Serialize
-            .body(serde_json::to_vec(&br).expect("BanRequest to vec"))
+            .json(&br)
             .header(ANALYZER_HEADER, br.analyzer.as_str())
-            .header(CONTENT_TYPE, APPLICATION_JSON)
             .send()
             .await
             .map_err(|e| ForwarderError::SendRequest(e.to_string()))?;
