@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use anyhow::Error;
 use chrono::prelude::*;
 
-use super::data::Data;
+use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validator::ip_count::{BanRule, BanRuleConfig};
@@ -13,7 +13,7 @@ use crate::validator::Validator;
 pub struct IPCount {
     ban_desc: String,
     rules: Vec<BanRule>,
-    ip_data: HashMap<String, Data>,
+    ip_data: HashMap<String, State>,
 }
 
 impl IPCount {
@@ -46,7 +46,6 @@ impl IPCount {
 }
 
 impl Validator for IPCount {
-
     #[tracing::instrument(skip(self))]
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
@@ -54,12 +53,12 @@ impl Validator for IPCount {
         let mut data = self
             .ip_data
             .entry(ip.clone())
-            .or_insert_with(|| Data::new(rule.limit as usize));
+            .or_insert_with(|| State::new(rule.limit as usize));
 
         let now = Utc::now();
 
         // No ban now
-        if data.applied_rule_id.is_none() {
+        if data.applied_rule_idx.is_none() {
             data.recent_requests.push(now);
             if !data.recent_requests.is_full() {
                 return Ok(None);
@@ -71,10 +70,15 @@ impl Validator for IPCount {
             data.resets_at = Utc::now() + rule.reset_duration;
             data.recent_requests.clear();
             data.requests_since_last_ban = 0;
-            data.applied_rule_id = Some(0);
+            data.applied_rule_idx = Some(0);
 
             let rule = self.rules[0];
-            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
+            tracing::info!(
+                action = "ban",
+                ip = ip.as_str(),
+                limit = rule.limit,
+                ttl = rule.ban_duration.num_seconds()
+            );
             return Ok(Some(self.ban(0, ip)));
         }
 
@@ -89,12 +93,17 @@ impl Validator for IPCount {
         data.requests_since_last_ban += 1;
 
         let rule_idx = data
-            .applied_rule_id
+            .applied_rule_idx
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if data.try_apply_rule(&self.rules, rule_idx, now) {
+        if data.apply_rule_if_possible(&self.rules, rule_idx, now) {
             let rule = self.rules[rule_idx];
-            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
+            tracing::info!(
+                action = "ban",
+                ip = ip.as_str(),
+                limit = rule.limit,
+                ttl = rule.ban_duration.num_seconds()
+            );
             return Ok(Some(self.ban(rule_idx, ip)));
         }
 
