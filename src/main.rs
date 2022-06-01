@@ -37,7 +37,7 @@ async fn main() -> io::Result<()> {
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
 
-    let request_consumer_fut = tokio::spawn(async move { kafka_request_consumer.run(s).await });
+    let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 
     let fw: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
@@ -47,14 +47,20 @@ async fn main() -> io::Result<()> {
 
     let forwarder_svc = forwarder::service::Service::new(fw);
 
-    let forwarder_fut = tokio::spawn(async move { forwarder_svc.run(fr).await });
+    let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
-    let validator_fut = tokio::spawn(async move { validator_svc.run(r, fs).await });
+    let validator_handle = tokio::spawn(async move { validator_svc.run(r, fs).await });
 
-    if let Err(e) =
-        futures::future::try_join3(request_consumer_fut, forwarder_fut, validator_fut).await
-    {
-        panic!("{:?}", e)
+    tokio::select! {
+        _ = request_consumer_handle => (),
+
+        _ = forwarder_handle => (),
+
+        res = validator_handle => {
+            if let Err(e) = res {
+                tracing::error!("{:?}", e)
+            }
+        }
     }
 
     Ok(())
