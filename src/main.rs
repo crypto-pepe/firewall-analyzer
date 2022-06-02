@@ -58,6 +58,8 @@ async fn main() -> io::Result<()> {
         res = request_consumer_handle => {
             if let Err(e) = res {
                 tracing::error!("{:?}", e)
+            } else  {
+                tracing::info!("request consumer")
             }
         },
 
@@ -66,7 +68,10 @@ async fn main() -> io::Result<()> {
         res = validator_handle => {
             if let Err(e) = res {
                 tracing::error!("{:?}", e)
+            } else  {
+                tracing::info!("validator svc finished")
             }
+
         }
     }
 
