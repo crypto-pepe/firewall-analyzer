@@ -63,7 +63,9 @@ async fn main() -> io::Result<()> {
             }
         },
 
-        _ = forwarder_handle => (),
+        _ = forwarder_handle => {
+             tracing::info!("forwarder finished")
+        },
 
         res = validator_handle => {
             if let Err(e) = res {
