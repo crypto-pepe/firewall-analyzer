@@ -1,11 +1,8 @@
 use async_trait::async_trait;
-use futures::future::join_all;
-use futures::TryStreamExt;
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, Message};
+use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
 use kafka::Error;
 use pepe_config::kafka::consumer::Config;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::SendError;
 
 use crate::consumer::RequestConsumer;
 use crate::model::Request;
@@ -47,31 +44,21 @@ impl RequestConsumer for KafkaRequestConsumer {
                 }
             };
             for ms in mss.iter() {
-                let futs = ms
-                    .messages()
-                    .iter()
-                    .filter_map(move |m| {
-                        let data = m.value.clone();
-                        let reqs: Vec<Request> = match serde_json::from_slice(data) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                tracing::error!("{:?}", e);
-                                return None;
-                            }
-                        };
-                        let req_handlers = reqs
-                            .into_iter()
-                            .filter_map(|req| Some(out.send(req)))
-                            .collect::<Vec<_>>();
-                        Some(req_handlers)
-                    })
-                    .flatten();
-                let futs = join_all(futs).await;
-
-                // if let Err(e) = futs.iter().try_for_each(|&f| f){
-                //   return Err(anyhow::Error::from(e));
-                // }
-
+                for m in ms.messages() {
+                    let reqs: Vec<Request> = match serde_json::from_slice(m.value) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            tracing::error!("{:?}", e);
+                            continue;
+                        }
+                    };
+                    for req in reqs {
+                        if let Err(e) = out.send(req).await {
+                            tracing::error!("{:?}", e);
+                            return Err(anyhow::Error::from(e));
+                        }
+                    }
+                }
                 if let Err(e) = self.c.consume_messageset(ms) {
                     tracing::error!("{:?}", e);
                     continue;
