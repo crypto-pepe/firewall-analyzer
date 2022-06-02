@@ -25,9 +25,10 @@ impl KafkaRequestConsumer {
             c = c.with_fetch_max_wait_time(t.into());
         }
 
-        for topic in &cfg.topics {
-            c = c.with_topic(topic.to_string());
-        }
+        c = cfg
+            .topics
+            .iter()
+            .fold(c, |c, t| c.with_topic(t.to_string()));
 
         let c = c.create()?;
         Ok(KafkaRequestConsumer { c })
