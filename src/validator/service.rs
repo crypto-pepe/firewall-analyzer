@@ -1,3 +1,4 @@
+use futures::future::join_all;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -39,24 +40,26 @@ impl Service {
                 },
             };
 
-            for v in &self.validators {
+            let handles = self.validators.iter().filter_map(|v| {
                 let res = v.validate(r.clone());
                 match res {
                     Ok(obr) => match obr {
                         Some(s) => {
                             tracing::info!("ban: {:?}", s);
-                            if let Err(e) = send.send(s).await {
-                                tracing::error!("{:?}", e);
-                                return Err(ProcessingError::ChannelUnavailable(e));
-                            }
+                            Some(send.send(s))
                         }
-                        None => (),
+                        None => None,
                     },
                     Err(e) => {
                         tracing::error!("{:?}", e);
+                        None
                     }
                 }
-            }
+            });
+            if let Err(e) = join_all(handles).await.into_iter().try_for_each(|r| r) {
+                tracing::error!("{:?}", e);
+                return Err(ProcessingError::ChannelUnavailable(e));
+            };
         }
     }
 }
