@@ -7,8 +7,8 @@ pub struct NoopClient {}
 
 #[async_trait]
 impl ExecutorClient for NoopClient {
-    async fn send_ban_request(&self, _br: BanRequest) -> Result<(), ForwarderError> {
-        tracing::warn!("dry run mod");
+    async fn ban(&self, _br: BanRequest) -> Result<(), ForwarderError> {
+        tracing::warn!("dry run mode");
         Ok(())
     }
 }
