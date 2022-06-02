@@ -1,8 +1,10 @@
 use async_trait::async_trait;
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
+use futures::{stream, TryStreamExt};
+use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
 use kafka::Error;
 use pepe_config::kafka::consumer::Config;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::consumer::RequestConsumer;
 use crate::model::Request;
@@ -36,37 +38,46 @@ impl KafkaRequestConsumer {
 impl RequestConsumer for KafkaRequestConsumer {
     async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), anyhow::Error> {
         loop {
-            let mss = match self.c.poll() {
+            let consumer = Arc::new(Mutex::new(&mut self.c));
+            let consumer = consumer.clone();
+            let mss = match consumer.lock().await.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     continue;
                 }
             };
-            for ms in mss.iter() {
-                for m in ms.messages() {
-                    let reqs: Vec<Request> = match serde_json::from_slice(m.value) {
-                        Ok(r) => r,
-                        Err(e) => {
-                            tracing::error!("{:?}", e);
-                            continue;
-                        }
-                    };
-                    for req in reqs {
-                        if let Err(e) = out.send(req).await {
-                            tracing::error!("{:?}", e);
-                            return Err(anyhow::Error::from(e));
-                        }
-                    }
-                }
-                if let Err(e) = self.c.consume_messageset(ms) {
-                    tracing::error!("{:?}", e);
-                    continue;
-                }
-            }
-            if let Err(e) = self.c.commit_consumed() {
+
+            let stream = stream::iter(mss.iter().map::<Result<MessageSet, anyhow::Error>, _>(Ok));
+
+            stream
+                .try_for_each(|ms| async {
+                    let fs = ms
+                        .messages()
+                        .iter()
+                        .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
+                            Ok(r) => Some(r),
+                            Err(e) => {
+                                tracing::error!("{:?}", e);
+                                None
+                            }
+                        })
+                        .flatten()
+                        .map(|req| out.send(req))
+                        .collect::<Vec<_>>();
+
+                    futures::future::try_join_all(fs).await?;
+
+                    consumer
+                        .lock()
+                        .await
+                        .consume_messageset(ms)
+                        .map_err(|e| e.into())
+                })
+                .await?;
+            if let Err(e) = consumer.lock().await.commit_consumed() {
                 tracing::error!("{:?}", e);
-            }
+            };
         }
     }
 }
