@@ -52,7 +52,11 @@ async fn main() -> io::Result<()> {
     let validator_handle = tokio::spawn(async move { validator_svc.run(r, fs).await });
 
     tokio::select! {
-        _ = request_consumer_handle => (),
+        res = request_consumer_handle => {
+            if let Err(e) = res {
+                tracing::error!("{:?}", e)
+            }
+        },
 
         _ = forwarder_handle => (),
 
