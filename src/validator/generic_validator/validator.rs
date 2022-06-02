@@ -3,108 +3,15 @@ use std::collections::HashMap;
 
 use anyhow::Error;
 use chrono::prelude::*;
+use circular_queue::CircularQueue;
 
-use super::data::Data;
+use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
-use crate::validator::ip_count::{BanRule, BanRuleConfig};
+use crate::validator::generic_validator::{BanRule, BanRuleConfig};
+use crate::validator::generic_validator::state::CostThreshold;
 use crate::validator::Validator;
 
-pub struct IPCount {
-    ban_desc: String,
-    rules: Vec<BanRule>,
-    ip_data: HashMap<String, Data>,
-}
-
-impl IPCount {
-    pub fn new(rules: Vec<BanRuleConfig>, ban_desc: String) -> Self {
-        let ip_data = HashMap::new();
-        IPCount {
-            rules: rules.iter().map(|b| (*b).into()).collect(),
-            ban_desc,
-            ip_data,
-        }
-    }
-
-    #[tracing::instrument(skip(self, rule_idx))]
-    fn ban(&self, rule_idx: usize, ip: String) -> BanRequest {
-        BanRequest {
-            target: BanTarget {
-                ip: Some(ip),
-                user_agent: None,
-            },
-            reason: self.ban_desc.clone(),
-            ttl: self
-                .rules
-                .get(rule_idx)
-                .expect(&*format!("rule {} not found", rule_idx))
-                .ban_duration
-                .num_seconds() as u32,
-            analyzer: self.name(),
-        }
-    }
-}
-
-impl Validator for IPCount {
-
-    #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
-        let ip = req.remote_ip;
-        let rule = self.rules.get(0).expect("at least one rule required");
-        let mut data = self
-            .ip_data
-            .entry(ip.clone())
-            .or_insert_with(|| Data::new(rule.limit as usize));
-
-        let now = Utc::now();
-
-        // No ban now
-        if data.applied_rule_id.is_none() {
-            data.recent_requests.push(now);
-            if !data.recent_requests.is_full() {
-                return Ok(None);
-            }
-            if *data.recent_requests.iter().last().unwrap() <= now - rule.reset_duration {
-                return Ok(None);
-            }
-
-            data.resets_at = Utc::now() + rule.reset_duration;
-            data.recent_requests.clear();
-            data.requests_since_last_ban = 0;
-            data.applied_rule_id = Some(0);
-
-            let rule = self.rules[0];
-            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
-            return Ok(Some(self.ban(0, ip)));
-        }
-
-        // was banned
-
-        if data.should_reset_timeout() {
-            data.reset(now);
-            tracing::info!(action = "reset", ip = ip.as_str());
-            return Ok(None);
-        }
-
-        data.requests_since_last_ban += 1;
-
-        let rule_idx = data
-            .applied_rule_id
-            .map_or(0, |v| min(v + 1, self.rules.len() - 1));
-
-        if data.try_apply_rule(&self.rules, rule_idx, now) {
-            let rule = self.rules[rule_idx];
-            tracing::info!(action = "ban", ip = ip.as_str(), limit=rule.limit, ttl = rule.ban_duration.num_seconds());
-            return Ok(Some(self.ban(rule_idx, ip)));
-        }
-
-        Ok(None)
-    }
-
-    fn name(&self) -> String {
-        "ip_count".into()
-    }
-}
 
 #[cfg(test)]
 mod tests {
