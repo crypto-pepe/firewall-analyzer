@@ -3,6 +3,7 @@ use tokio::sync::mpsc;
 
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
+use crate::validator::Validator;
 
 mod config;
 mod consumer;
@@ -28,11 +29,13 @@ async fn main() -> io::Result<()> {
 
     let mut kafka_request_consumer =
         KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
-    let mut validator_svc = validator::service::Service::build();
 
-    for v in cfg.validators {
-        validator_svc = validator_svc.with_validator(Box::new(validator::get_validator(v)));
-    }
+    let validators = cfg
+        .validators
+        .into_iter()
+        .map(|v| Box::new(validator::get_validator(v)) as Box<dyn Validator + Sync + Send>)
+        .collect();
+    let validator_svc = validator::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
