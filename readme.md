@@ -32,7 +32,7 @@
 | Name    | Type   | Default | Required | Note                                   |
 |---------|--------|---------|----------|----------------------------------------|
 | idx     | int    |         | Yes      | id of validator                        |
-| ban_ttl | string | 10s     | No       | TTL for banned target. Duration string |
+| ban_ttl | string | 120s    | No       | TTL for banned target. Duration string |
 
 ## Writing your own validator
 
@@ -44,30 +44,17 @@ Inside of `src/validator/mod.rs` add your validator and its parameters to `Confi
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Config {
-    Dummy {
-        idx: u16,
-        ban_ttl: Option<DurationString>,
-    },
+    Dummy(dummy::Config),
 }
 ```
 
 Then add creating of your validator to `get_validator`
 
 ```rust
-pub fn get_validator(cfg: Config) -> impl Validator {
-    match cfg {
-        Dummy { idx, ban_ttl } => {
-            let ban_ttl_secs = match ban_ttl {
-                Some(ban_ttl) => {
-                    let dur: Duration = ban_ttl.into();
-                    dur.as_secs()
-                }
-                None => 120,
-            };
-
-            DummyValidator { idx, ban_ttl_secs }
-        }
-    }
+pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
+    Box::new(match cfg {
+        Config::Dummy(cfg) => DummyValidator::new(cfg),
+    })
 }
 ```
 

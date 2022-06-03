@@ -23,8 +23,8 @@ pub enum Config {
     Dummy(dummy::Config),
 }
 
-pub fn get_validator(cfg: Config) -> Box<dyn Validator> {
-    match cfg {
-        Config::Dummy(cfg) => DummyValidator::new(cfg)
-    }
+pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
+    Box::new(match cfg {
+        Config::Dummy(cfg) => DummyValidator::new(cfg),
+    })
 }
