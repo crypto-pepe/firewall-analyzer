@@ -3,7 +3,6 @@ use tokio::sync::mpsc;
 
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
-use crate::validator::Validator;
 
 mod config;
 mod consumer;
@@ -33,7 +32,7 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map(|v| Box::new(validator::get_validator(v)) as Box<dyn Validator + Sync + Send>)
+        .map(|v|validator::get_validator(v))
         .collect();
     let validator_svc = validator::service::Service::from_validators(validators);
 

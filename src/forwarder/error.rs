@@ -9,6 +9,6 @@ pub enum ForwarderError {
     #[error("send request error: {0:?}")]
     SendRequest(String),
 
-    #[error("new forwarder error: {0:?}")]
-    NewForwarder(String),
+    #[error("build forwarder error: {0:?}")]
+    BuildForwarder(String),
 }

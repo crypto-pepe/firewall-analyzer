@@ -49,7 +49,11 @@ impl Service {
                     }
                 }
             });
-            if let Err(e) = join_all(handles).await.into_iter().try_for_each(|r| r) {
+            if let Err(e) = join_all(handles)
+                .await
+                .into_iter()
+                .collect::<Result<(), _>>()
+            {
                 tracing::error!("{:?}", e);
                 return Err(ProcessingError::ChannelUnavailable(e));
             };
