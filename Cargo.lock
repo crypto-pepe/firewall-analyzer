@@ -512,6 +512,7 @@ dependencies = [
  "duration-string",
  "futures",
  "kafka",
+ "num-traits",
  "opentelemetry",
  "opentelemetry-jaeger",
  "pepe-config",

@@ -1,46 +1,58 @@
+use std::cmp::min;
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::Hash;
+
+use anyhow::Error;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use circular_queue::CircularQueue;
+use num_traits::PrimInt;
+use tracing::Value;
+
 pub(crate) use rule::BanRule;
 pub use rule::BanRuleConfig;
-pub use validator::CustomCostValidator;
-use crate::model::{BanRequest, BanTarget};
+
+use crate::model::{BanRequest, BanTarget, Request};
+use crate::validator::Validator;
 
 mod rule;
-mod state;
-pub mod validator;
 
-pub trait Cost:Ord {
-    fn cost(&self) -> u64;
-}
-
-pub trait CostThreshold<C: Cost> {
-    fn add(&mut self, req: C, time: DateTime<Utc>);
+pub trait InitStateHolder: Debug {
+    fn new(r: &BanRule) -> Self;
+    fn add(&mut self, req: Request, time: DateTime<Utc>);
     fn latest_value_added_at(&self) -> Option<DateTime<Utc>>;
+    fn is_above_limit(&self, time: &DateTime<Utc>) -> bool;
     fn clear(&mut self);
 }
 
-struct CountThreshold<T> {
-    reqs: CircularQueue<DateTime<Utc>>
+#[derive(Debug)]
+pub struct CountStateHolder {
+    reqs: CircularQueue<DateTime<Utc>>,
 }
 
-impl CostThreshold<DateTime<Utc>> for CountThreshold<T> {
-    // fn set_limit(&mut self, limit: u64) {
-    //     let mut reqs = CircularQueue::with_capacity(limit as usize);
-    //     self.reqs.iter().for_each(|r| {reqs.push(*r);});
-    //     self.reqs = reqs
-    // }
+impl InitStateHolder for CountStateHolder {
+    fn new(r: &BanRule) -> Self {
+        CountStateHolder {
+            reqs: CircularQueue::with_capacity(r.limit as usize),
+        }
+    }
 
-    fn add(&mut self, _req: T, time: DateTime<Utc>) {
+    fn add(&mut self, _req: Request, time: DateTime<Utc>) {
         self.reqs.push(time);
     }
 
-    fn is_above_limit(&self) -> bool {
-        !self.reqs.is_full() ||
+    fn latest_value_added_at(&self) -> Option<DateTime<Utc>> {
+        match self.reqs.iter().last().clone() {
+            Some(s) => Some(*s),
+            None => None,
+        }
     }
 
-    fn latest_value_added_at(&self) -> Option<DateTime<Utc>> {
-        *self.reqs.iter().last().clone()
+    fn is_above_limit(&self, time: &DateTime<Utc>) -> bool {
+        if !self.reqs.is_full() {
+            return false;
+        }
+        self.reqs.iter().last().expect("reqs is full") > time
     }
 
     fn clear(&mut self) {
@@ -49,19 +61,19 @@ impl CostThreshold<DateTime<Utc>> for CountThreshold<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct State<T> {
+pub struct State<T: InitStateHolder> {
     pub cost_since_last_ban: u64,
     pub applied_rule_id: Option<usize>,
-    pub base_costs: dyn CostThreshold<T>,
+    pub base_costs: T,
     pub resets_at: DateTime<Utc>,
 }
 
-impl State<T> {
-    pub fn new(ct: impl CostThreshold<T>) -> Self {
+impl<IST: InitStateHolder> State<IST> {
+    pub fn new(br: &BanRule) -> Self {
         State {
             cost_since_last_ban: 0,
             applied_rule_id: None,
-            base_costs: ct,
+            base_costs: IST::new(br),
             resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
         }
     }
@@ -70,8 +82,8 @@ impl State<T> {
         self.resets_at <= Utc::now() && self.applied_rule_id.is_some()
     }
 
-    pub fn reset(&mut self, last_request_time: DateTime<Utc>) {
-        self.base_costs.add(last_request_time);
+    pub fn reset(&mut self, req: Request, last_request_time: DateTime<Utc>) {
+        self.base_costs.add(req, last_request_time);
         self.applied_rule_id = None;
     }
 
@@ -94,15 +106,38 @@ impl State<T> {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+pub struct RequestIP {
+    ip: String,
+}
 
-pub struct CustomCostValidator<T, S> {
+impl From<Request> for RequestIP {
+    fn from(r: Request) -> Self {
+        RequestIP { ip: r.remote_ip }
+    }
+}
+
+impl From<RequestIP> for BanTarget {
+    fn from(r: RequestIP) -> Self {
+        BanTarget {
+            ip: Some(r.ip),
+            user_agent: None,
+        }
+    }
+}
+
+pub type IPReqCountValidator = CustomCostValidator<RequestIP, CountStateHolder>;
+
+pub struct CustomCostValidator<T: From<Request> + Hash + Eq + Into<BanTarget>, S: InitStateHolder> {
     ban_desc: String,
     rules: Vec<BanRule>,
     target_data: HashMap<T, State<S>>,
 }
 
-impl CustomCostValidator<T, S> {
-    pub fn new<T, S>(rules: Vec<BanRuleConfig>, ban_desc: String) -> Self {
+impl<T: From<Request> + Hash + Eq + Clone + Into<BanTarget> + Debug, S: InitStateHolder>
+    CustomCostValidator<T, S>
+{
+    pub fn new(rules: Vec<BanRuleConfig>, ban_desc: String) -> Self {
         let ip_data: HashMap<T, State<S>> = HashMap::new();
         CustomCostValidator {
             rules: rules.iter().map(|b| (*b).into()).collect(),
@@ -112,7 +147,7 @@ impl CustomCostValidator<T, S> {
     }
 
     #[tracing::instrument(skip(self, rule_idx))]
-    fn ban<T: Into<BanTarget>>(&self, rule_idx: usize, target: T) -> BanRequest {
+    fn ban(&self, rule_idx: usize, target: T) -> BanRequest {
         BanRequest {
             target: target.into(),
             reason: self.ban_desc.clone(),
@@ -127,27 +162,30 @@ impl CustomCostValidator<T, S> {
     }
 }
 
-
-impl Validator for CustomCostValidator<T, S> {
+impl<T: From<Request> + Hash + Eq + Clone + Into<BanTarget> + Debug, S: InitStateHolder> Validator
+    for CustomCostValidator<T, S>
+{
     #[tracing::instrument(skip(self))]
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
-        let target = T::from(req);
+        let target = T::from(req.clone());
         let rule = self.rules.get(0).expect("at least one rule required");
         let mut state = self
             .target_data
             .entry(target.clone())
-            .or_insert_with(|| State::new(rule.limit as usize));
+            .or_insert_with(|| State::new(rule));
 
         let now = Utc::now();
 
         // No ban now
         if state.applied_rule_id.is_none() {
-            state.base_costs.add(1, now);
-            if !state.base_costs.is_above_limit() {
+            state.base_costs.add(req.clone(), now);
+            if !state.base_costs.is_above_limit(&now) {
                 return Ok(None);
             }
-            if state.base_costs.latest_value_added_at() <= now - rule.reset_duration {
-                return Ok(None);
+            if let Some(lvaa) = state.base_costs.latest_value_added_at() {
+                if lvaa <= now - rule.reset_duration {
+                    return Ok(None);
+                }
             }
 
             state.resets_at = Utc::now() + rule.reset_duration;
@@ -158,7 +196,7 @@ impl Validator for CustomCostValidator<T, S> {
             let rule = self.rules[0];
             tracing::info!(
                 action = "ban",
-                ip = target.as_str(),
+                taget = ?target,
                 limit = rule.limit,
                 ttl = rule.ban_duration.num_seconds()
             );
@@ -168,8 +206,8 @@ impl Validator for CustomCostValidator<T, S> {
         // was banned
 
         if state.should_reset_timeout() {
-            state.reset(now);
-            tracing::info!(action = "reset", ip = target.as_str());
+            state.reset(req.clone(), now);
+            tracing::info!(action = "reset", target = ?target);
             return Ok(None);
         }
 
@@ -183,7 +221,7 @@ impl Validator for CustomCostValidator<T, S> {
             let rule = self.rules[rule_idx];
             tracing::info!(
                 action = "ban",
-                ip = target.as_str(),
+                target = ?target,
                 limit = rule.limit,
                 ttl = rule.ban_duration.num_seconds()
             );
@@ -194,6 +232,6 @@ impl Validator for CustomCostValidator<T, S> {
     }
 
     fn name(&self) -> String {
-        "ip_count".into()
+        "generic_counter".into()
     }
 }

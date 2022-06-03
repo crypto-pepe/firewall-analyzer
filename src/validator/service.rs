@@ -5,6 +5,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use crate::error::ProcessingError;
 use crate::model;
 use crate::model::BanRequest;
+use crate::validator::generic_validator::{BanRuleConfig, IPReqCountValidator};
 use crate::validator::Validator;
 
 pub struct Service {
@@ -17,7 +18,7 @@ impl Service {
     }
 
     pub async fn run(
-        &self,
+        &mut self,
         mut recv: Receiver<model::Request>,
         send: Sender<BanRequest>,
     ) -> Result<(), ProcessingError<BanRequest>> {
@@ -33,7 +34,7 @@ impl Service {
                 },
             };
 
-            let handles = self.validators.iter().filter_map(|v| {
+            let handles = self.validators.iter_mut().filter_map(|v| {
                 let res = v.validate(r.clone());
                 match res {
                     Ok(obr) => match obr {

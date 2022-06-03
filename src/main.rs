@@ -11,7 +11,6 @@ mod forwarder;
 mod model;
 mod telemetry;
 mod validator;
-mod receiver;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -33,9 +32,9 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map(|v|validator::get_validator(v))
+        .map(|v| validator::get_validator(v))
         .collect();
-    let validator_svc = validator::service::Service::from_validators(validators);
+    let mut validator_svc = validator::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
@@ -73,7 +72,6 @@ async fn main() -> io::Result<()> {
             } else  {
                 tracing::info!("validator svc finished")
             }
-
         }
     }
 
