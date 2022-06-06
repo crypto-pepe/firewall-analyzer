@@ -31,7 +31,7 @@ pub trait RequestCoster {
 #[derive(Debug)]
 pub struct State<T: InitStateHolder> {
     pub cost_since_last_ban: u64,
-    pub applied_rule_id: Option<usize>,
+    pub applied_rule_idx: Option<usize>,
     pub base_costs: T,
     pub resets_at: DateTime<Utc>,
 }
@@ -40,22 +40,22 @@ impl<T: InitStateHolder> State<T> {
     pub fn new(br: &BanRule) -> Self {
         State {
             cost_since_last_ban: 0,
-            applied_rule_id: None,
+            applied_rule_idx: None,
             base_costs: T::new(br),
             resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
         }
     }
 
     pub fn should_reset_timeout(&self) -> bool {
-        self.resets_at <= Utc::now() && self.applied_rule_id.is_some()
+        self.resets_at <= Utc::now() && self.applied_rule_idx.is_some()
     }
 
     pub fn reset(&mut self, req: Request, last_request_time: DateTime<Utc>) {
         self.base_costs.add(req, last_request_time);
-        self.applied_rule_id = None;
+        self.applied_rule_idx = None;
     }
 
-    pub fn try_apply_rule(
+    pub fn apply_rule_if_required(
         &mut self,
         rules: &[BanRule],
         rule_idx: usize,
@@ -67,7 +67,7 @@ impl<T: InitStateHolder> State<T> {
         if self.cost_since_last_ban >= rule.limit {
             self.resets_at = last_request_time + rule.reset_duration;
             self.cost_since_last_ban = 0;
-            self.applied_rule_id = Some(rule_idx + 1);
+            self.applied_rule_idx = Some(rule_idx + 1);
             return true;
         }
         false
@@ -137,7 +137,7 @@ impl<
         let now = Utc::now();
 
         // No ban now
-        if state.applied_rule_id.is_none() {
+        if state.applied_rule_idx.is_none() {
             state.base_costs.add(req, now);
             if !state
                 .base_costs
@@ -145,8 +145,8 @@ impl<
             {
                 return Ok(None);
             }
-            if let Some(lvaa) = state.base_costs.latest_value_added_at() {
-                if lvaa <= now - rule.reset_duration {
+            if let Some(t) = state.base_costs.latest_value_added_at() {
+                if t <= now - rule.reset_duration {
                     return Ok(None);
                 }
             }
@@ -154,7 +154,7 @@ impl<
             state.resets_at = Utc::now() + rule.reset_duration;
             state.base_costs.clear();
             state.cost_since_last_ban = 0;
-            state.applied_rule_id = Some(0);
+            state.applied_rule_idx = Some(0);
 
             let rule = self.rules[0];
             tracing::info!(
@@ -177,10 +177,10 @@ impl<
         state.cost_since_last_ban += C::cost(&req);
 
         let rule_idx = state
-            .applied_rule_id
+            .applied_rule_idx
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if state.try_apply_rule(&self.rules, rule_idx, now) {
+        if state.apply_rule_if_required(&self.rules, rule_idx, now) {
             let rule = self.rules[rule_idx];
             tracing::info!(
                 action = "ban",
