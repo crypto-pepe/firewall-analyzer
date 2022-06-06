@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 // USE ONLY FOR TESTING
-// Dummy prints request and if dummy's idx is odd - bans ip for self idx * minutes
+// Dummy prints request and if dummy's idx is odd - bans ip for ban_ttl_secs or 120s, if not stated
 pub struct Dummy {
     pub idx: u16,
     pub ban_ttl_secs: u64,

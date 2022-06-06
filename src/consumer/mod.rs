@@ -9,5 +9,5 @@ mod service;
 
 #[async_trait]
 pub trait RequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), anyhow::Error>;
+    async fn run(&mut self, out: mpsc::Sender<Request>) -> anyhow::Result<()>;
 }

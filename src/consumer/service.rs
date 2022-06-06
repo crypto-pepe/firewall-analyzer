@@ -37,7 +37,7 @@ impl KafkaRequestConsumer {
 
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), anyhow::Error> {
+    async fn run(&mut self, out: mpsc::Sender<Request>) -> anyhow::Result<()> {
         loop {
             let consumer = Arc::new(Mutex::new(&mut self.c));
             let consumer = consumer.clone();
