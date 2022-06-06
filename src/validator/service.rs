@@ -5,7 +5,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use crate::error::ProcessingError;
 use crate::model;
 use crate::model::BanRequest;
-use crate::validator::generic_validator::{BanRuleConfig, IPReqCountValidator};
 use crate::validator::Validator;
 
 pub struct Service {
