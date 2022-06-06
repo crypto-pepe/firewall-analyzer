@@ -32,7 +32,7 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map(|v| validator::get_validator(v))
+        .map(validator::get_validator)
         .collect();
     let mut validator_svc = validator::service::Service::from_validators(validators);
 

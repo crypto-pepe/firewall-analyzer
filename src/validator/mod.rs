@@ -3,10 +3,12 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::generic_validator::{BanRuleConfig, IPReqCountValidator};
+use crate::validator::generic_validator::BanRuleConfig;
+use crate::validator::ip_count::IPReqCountValidator;
 
 pub mod dummy;
 mod generic_validator;
+mod ip_count;
 pub mod service;
 
 pub trait Validator {
@@ -30,6 +32,10 @@ pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
         Config::IpCount {
             limits: rules,
             ban_description,
-        } => Box::new(IPReqCountValidator::new(rules, ban_description)),
+        } => Box::new(IPReqCountValidator::new(
+            rules,
+            ban_description,
+            "ip_count".to_string(),
+        )),
     }
 }
