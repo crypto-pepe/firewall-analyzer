@@ -6,7 +6,7 @@ use circular_queue::CircularQueue;
 pub struct CostCount {}
 
 impl RequestCoster for CostCount {
-    fn cost(_r: &Request) -> u64 {
+    fn cost(&self, _r: &Request) -> u64 {
         1
     }
 }

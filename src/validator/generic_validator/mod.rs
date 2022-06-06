@@ -19,5 +19,5 @@ pub trait BaseCostCounter: Debug {
 }
 
 pub trait RequestCoster {
-    fn cost(r: &Request) -> u64;
+    fn cost(&self, r: &Request) -> u64;
 }

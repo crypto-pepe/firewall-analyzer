@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
+use crate::validator::generic_validator::count::CostCount;
 use crate::validator::generic_validator::rule::BanRuleConfig;
 use crate::validator::ip_count::IPReqCountValidator;
 
@@ -34,6 +35,7 @@ pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
             ban_description,
         } => Box::new(IPReqCountValidator::new(
             rules,
+            CostCount {},
             ban_description,
             "ip_count".to_string(),
         )),

@@ -27,13 +27,13 @@ pub type IPReqCountValidator = CustomCostValidator<RequestIP, CountStateHolder, 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::marker::PhantomData;
 
     use anyhow::Error;
     use chrono::Duration;
 
     use crate::model::{BanRequest, BanTarget, Request};
-    use crate::validator::generic_validator::BanRule;
+    use crate::validator::generic_validator::count::CostCount;
+    use crate::validator::generic_validator::rule::BanRule;
     use crate::validator::ip_count::IPReqCountValidator;
     use crate::validator::Validator;
 
@@ -67,7 +67,7 @@ mod tests {
             ],
             target_data: HashMap::new(),
             name: "generic_counter".to_string(),
-            _phantom_c: PhantomData::default(),
+            coster: CostCount {},
         }
     }
 

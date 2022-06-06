@@ -2,7 +2,6 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::marker::PhantomData;
 
 use crate::validator::generic_validator::state::State;
 use anyhow::Error;
@@ -22,7 +21,7 @@ pub struct CustomCostValidator<
     pub(crate) rules: Vec<BanRule>,
     pub(crate) target_data: HashMap<T, State<S>>,
     pub(crate) name: String,
-    pub(crate) _phantom_c: PhantomData<C>,
+    pub(crate) coster: C,
 }
 
 impl<
@@ -31,14 +30,14 @@ impl<
         C: RequestCoster,
     > CustomCostValidator<T, S, C>
 {
-    pub fn new(rules: Vec<BanRuleConfig>, ban_desc: String, name: String) -> Self {
+    pub fn new(rules: Vec<BanRuleConfig>, coster: C, ban_desc: String, name: String) -> Self {
         let ip_data: HashMap<T, State<S>> = HashMap::new();
         CustomCostValidator {
             rules: rules.iter().map(|b| (*b).into()).collect(),
             ban_desc,
             name,
+            coster,
             target_data: ip_data,
-            _phantom_c: PhantomData::default(),
         }
     }
 
@@ -113,7 +112,7 @@ impl<
             return Ok(None);
         }
 
-        state.cost_since_last_ban += C::cost(&req);
+        state.cost_since_last_ban += self.coster.cost(&req);
 
         let rule_idx = state
             .applied_rule_idx
