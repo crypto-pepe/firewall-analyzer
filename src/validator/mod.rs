@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::generic_validator::BanRuleConfig;
+use crate::validator::generic_validator::rule::BanRuleConfig;
 use crate::validator::ip_count::IPReqCountValidator;
 
 pub mod dummy;
