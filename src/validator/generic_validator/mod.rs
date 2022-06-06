@@ -16,7 +16,7 @@ use crate::validator::Validator;
 pub mod count;
 pub mod rule;
 
-pub trait InitStateHolder: Debug {
+pub trait BaseCostCounter: Debug {
     fn new(r: &BanRule) -> Self;
     fn add(&mut self, req: Request, time: DateTime<Utc>);
     fn latest_value_added_at(&self) -> Option<DateTime<Utc>>;
@@ -29,14 +29,14 @@ pub trait RequestCoster {
 }
 
 #[derive(Debug)]
-pub struct State<T: InitStateHolder> {
+pub struct State<T: BaseCostCounter> {
     pub cost_since_last_ban: u64,
     pub applied_rule_idx: Option<usize>,
     pub base_costs: T,
     pub resets_at: DateTime<Utc>,
 }
 
-impl<T: InitStateHolder> State<T> {
+impl<T: BaseCostCounter> State<T> {
     pub fn new(br: &BanRule) -> Self {
         State {
             cost_since_last_ban: 0,
@@ -76,7 +76,7 @@ impl<T: InitStateHolder> State<T> {
 
 pub struct CustomCostValidator<
     T: From<Request> + Hash + Eq + Into<BanTarget>,
-    S: InitStateHolder,
+    S: BaseCostCounter,
     C: RequestCoster,
 > {
     pub(crate) ban_desc: String,
@@ -88,7 +88,7 @@ pub struct CustomCostValidator<
 
 impl<
         T: From<Request> + Hash + Eq + Clone + Into<BanTarget> + Debug,
-        S: InitStateHolder,
+        S: BaseCostCounter,
         C: RequestCoster,
     > CustomCostValidator<T, S, C>
 {
@@ -121,7 +121,7 @@ impl<
 
 impl<
         T: From<Request> + Hash + Eq + Clone + Into<BanTarget> + Debug,
-        S: InitStateHolder,
+        S: BaseCostCounter,
         C: RequestCoster,
     > Validator for CustomCostValidator<T, S, C>
 {

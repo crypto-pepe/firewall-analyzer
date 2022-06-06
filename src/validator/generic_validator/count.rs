@@ -1,5 +1,5 @@
 use crate::model::Request;
-use crate::validator::generic_validator::{BanRule, InitStateHolder, RequestCoster};
+use crate::validator::generic_validator::{BanRule, BaseCostCounter, RequestCoster};
 use chrono::{DateTime, Utc};
 use circular_queue::CircularQueue;
 
@@ -16,7 +16,7 @@ pub struct CountStateHolder {
     request_time: CircularQueue<DateTime<Utc>>,
 }
 
-impl InitStateHolder for CountStateHolder {
+impl BaseCostCounter for CountStateHolder {
     fn new(r: &BanRule) -> Self {
         CountStateHolder {
             request_time: CircularQueue::with_capacity(r.limit as usize),
