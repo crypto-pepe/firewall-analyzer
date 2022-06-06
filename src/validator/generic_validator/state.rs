@@ -24,8 +24,8 @@ impl<T: BaseCostCounter> State<T> {
         self.resets_at <= Utc::now() && self.applied_rule_idx.is_some()
     }
 
-    pub fn reset(&mut self, req: Request, last_request_time: DateTime<Utc>) {
-        self.base_costs.add(req, last_request_time);
+    pub fn reset(&mut self, cost: u64, last_request_time: DateTime<Utc>) {
+        self.base_costs.add(cost, last_request_time);
         self.applied_rule_idx = None;
     }
 

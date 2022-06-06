@@ -23,7 +23,7 @@ impl BaseCostCounter for CountStateHolder {
         }
     }
 
-    fn add(&mut self, _req: Request, time: DateTime<Utc>) {
+    fn add(&mut self, _cost: u64, time: DateTime<Utc>) {
         self.request_time.push(time);
     }
 

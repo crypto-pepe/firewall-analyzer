@@ -31,13 +31,13 @@ impl<
     > CustomCostValidator<T, S, C>
 {
     pub fn new(rules: Vec<BanRuleConfig>, coster: C, ban_desc: String, name: String) -> Self {
-        let ip_data: HashMap<T, State<S>> = HashMap::new();
+        let states: HashMap<T, State<S>> = HashMap::new();
         CustomCostValidator {
             rules: rules.iter().map(|b| (*b).into()).collect(),
             ban_desc,
             name,
             coster,
-            target_data: ip_data,
+            target_data: states,
         }
     }
 
@@ -76,7 +76,7 @@ impl<
 
         // No ban now
         if state.applied_rule_idx.is_none() {
-            state.base_costs.add(req, now);
+            state.base_costs.add(self.coster.cost(&req), now);
             if !state
                 .base_costs
                 .is_above_limit(&(now - rule.reset_duration))
@@ -107,7 +107,7 @@ impl<
         // was banned
 
         if state.should_reset_timeout() {
-            state.reset(req, now);
+            state.reset(self.coster.cost(&req), now);
             tracing::info!(action = "reset", target = ?target);
             return Ok(None);
         }

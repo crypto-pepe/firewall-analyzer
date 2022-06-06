@@ -11,6 +11,7 @@ pub mod dummy;
 mod generic_validator;
 mod ip_count;
 pub mod service;
+mod request_cost;
 
 pub trait Validator {
     fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error>;
