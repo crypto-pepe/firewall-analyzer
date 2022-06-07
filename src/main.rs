@@ -41,13 +41,13 @@ async fn main() -> io::Result<()> {
 
     let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 
-    let fw: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
+    let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
     } else {
         Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
     };
 
-    let forwarder_svc = forwarder::service::Service::new(fw);
+    let forwarder_svc = forwarder::service::Service::new(executor_client);
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
