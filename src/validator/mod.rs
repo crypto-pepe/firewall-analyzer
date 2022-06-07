@@ -1,13 +1,9 @@
-use std::time::Duration;
-
-use pepe_config::DurationString;
 use serde::{Deserialize, Serialize};
 
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
 use crate::validator::ip_count::IPCount;
-use crate::validator::Config::Dummy;
 
 pub mod dummy;
 pub mod ip_count;
@@ -29,11 +25,8 @@ pub enum Config {
 }
 
 pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
-    Box::new(match cfg {
-        Config::Dummy(cfg) => DummyValidator::new(cfg),
-    })
-            Box::new(DummyValidator { idx, ban_ttl_secs })
-
+    match cfg {
+        Config::Dummy(cfg) => Box::new(DummyValidator::new(cfg)),
         Config::IpCount {
             limits,
             ban_description,
