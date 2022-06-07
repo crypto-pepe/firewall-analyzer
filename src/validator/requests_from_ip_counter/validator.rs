@@ -25,20 +25,15 @@ impl IPCount {
         }
     }
 
-    #[tracing::instrument(skip(self, rule_idx))]
-    fn ban(&self, rule_idx: usize, ip: String) -> BanRequest {
+    #[tracing::instrument(skip(self))]
+    fn ban(&self, ttl: u32, ip: String) -> BanRequest {
         BanRequest {
             target: BanTarget {
                 ip: Some(ip),
                 user_agent: None,
             },
             reason: self.ban_description.clone(),
-            ttl: self
-                .rules
-                .get(rule_idx)
-                .expect(&*format!("rule {} not found", rule_idx))
-                .ban_duration
-                .num_seconds() as u32,
+            ttl,
             analyzer: self.name(),
         }
     }
@@ -78,7 +73,7 @@ impl Validator for IPCount {
                 limit = rule.limit,
                 ttl = rule.ban_duration.num_seconds()
             );
-            return Ok(Some(self.ban(0, ip)));
+            return Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)));
         }
 
         // was banned
@@ -103,7 +98,7 @@ impl Validator for IPCount {
                 limit = rule.limit,
                 ttl = rule.ban_duration.num_seconds()
             );
-            return Ok(Some(self.ban(rule_idx, ip)));
+            return Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)));
         }
 
         Ok(None)
