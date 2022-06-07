@@ -5,20 +5,19 @@ use crate::model::BanRequest;
 use crate::ExecutorClient;
 
 pub struct Service {
-    c: Box<dyn ExecutorClient + Send + Sync>,
+    client: Box<dyn ExecutorClient + Send + Sync>,
 }
 
 impl Service {
     pub fn new(c: Box<dyn ExecutorClient + Send + Sync>) -> Self {
-        Service { c }
+        Service { client: c }
     }
 
     pub async fn run(&self, mut recv: Receiver<BanRequest>) {
         loop {
             match recv.try_recv() {
-                // todo maybe blocking receive and inside of select?
                 Ok(s) => {
-                    if let Err(e) = self.c.send_ban_request(s).await {
+                    if let Err(e) = self.client.ban(s).await {
                         tracing::error!("{:?}", e)
                     }
                 }

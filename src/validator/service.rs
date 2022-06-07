@@ -1,30 +1,26 @@
+use futures::future::join_all;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
+use crate::error::ProcessingError;
 use crate::model;
+use crate::model::BanRequest;
 use crate::validator::Validator;
 
 pub struct Service {
-    pub validators: Vec<Box<dyn Validator>>,
+    pub validators: Vec<Box<dyn Validator + Sync + Send>>,
 }
 
 impl Service {
-    pub fn build() -> Self {
-        Service {
-            validators: Vec::new(),
-        }
-    }
-
-    pub fn with_validator(mut self, v: Box<dyn Validator>) -> Service {
-        self.validators.push(v);
-        self
+    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>) -> Service {
+        Service { validators: vv }
     }
 
     pub async fn run(
-        &mut self,
+        &self,
         mut recv: Receiver<model::Request>,
-        send: Sender<model::BanRequest>,
-    ) {
+        send: Sender<BanRequest>,
+    ) -> Result<(), ProcessingError<BanRequest>> {
         loop {
             let r = match recv.try_recv() {
                 Ok(r) => r,
@@ -32,27 +28,35 @@ impl Service {
                     TryRecvError::Empty => continue,
                     TryRecvError::Disconnected => {
                         tracing::error!("{:?}", e);
-                        return;
+                        return Err(ProcessingError::ChannelDisconnected(e));
                     }
                 },
             };
 
-            for v in &mut self.validators {
-                match v.validate(r.clone()) {
+            let handles = self.validators.iter().filter_map(|v| {
+                let res = v.validate(r.clone());
+                match res {
                     Ok(obr) => match obr {
                         Some(s) => {
                             tracing::info!("ban: {:?}", s);
-                            if let Err(e) = send.send(s).await {
-                                tracing::error!("{:?}", e)
-                            }
+                            Some(send.send(s))
                         }
-                        None => (),
+                        None => None,
                     },
                     Err(e) => {
                         tracing::error!("{:?}", e);
+                        None
                     }
                 }
-            }
+            });
+            if let Err(e) = join_all(handles)
+                .await
+                .into_iter()
+                .collect::<Result<(), _>>()
+            {
+                tracing::error!("{:?}", e);
+                return Err(ProcessingError::ChannelUnavailable(e));
+            };
         }
     }
 }

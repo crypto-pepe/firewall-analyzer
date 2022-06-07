@@ -1,13 +1,14 @@
 use tokio::io;
 use tokio::sync::mpsc;
 
+use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
-use crate::receiver::{KafkaRequestReceiver, RequestReceiver};
 
 mod config;
+mod consumer;
+mod error;
 mod forwarder;
 mod model;
-mod receiver;
 mod telemetry;
 mod validator;
 
@@ -25,28 +26,55 @@ async fn main() -> io::Result<()> {
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
 
-    let mut krs = KafkaRequestReceiver::new(&cfg.kafka).expect("kafka request receiver");
-    let mut vs = validator::service::Service::build();
+    let mut kafka_request_consumer =
+        KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
 
-    for v in cfg.validators {
-        vs = vs.with_validator(validator::get_validator(v));
-    }
+    let validators = cfg
+        .validators
+        .into_iter()
+        .map( validator::get_validator)
+        .collect();
+    let validator_svc = validator::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
 
-    tokio::spawn(async move { krs.run(s).await });
+    let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 
-    let fw: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
+    let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
     } else {
         Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
     };
 
-    let fw = forwarder::service::Service::new(fw);
+    let forwarder_svc = forwarder::service::Service::new(executor_client);
 
-    tokio::spawn(async move { fw.run(fr).await });
+    let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
-    vs.run(r, fs).await;
+    let validator_handle = tokio::spawn(async move { validator_svc.run(r, fs).await });
+
+    tokio::select! {
+        res = request_consumer_handle => {
+            if let Err(e) = res {
+                tracing::error!("{:?}", e)
+            } else  {
+                tracing::info!("request consumer finished")
+            }
+        },
+
+        _ = forwarder_handle => {
+             tracing::info!("forwarder finished")
+        },
+
+        res = validator_handle => {
+            if let Err(e) = res {
+                tracing::error!("{:?}", e)
+            } else  {
+                tracing::info!("validator finished")
+            }
+
+        }
+    }
+
     Ok(())
 }
