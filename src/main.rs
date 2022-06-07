@@ -32,7 +32,7 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map(|v| validator::get_validator(v))
+        .map( validator::get_validator)
         .collect();
     let validator_svc = validator::service::Service::from_validators(validators);
 
@@ -58,7 +58,7 @@ async fn main() -> io::Result<()> {
             if let Err(e) = res {
                 tracing::error!("{:?}", e)
             } else  {
-                tracing::info!("request consumer")
+                tracing::info!("request consumer finished")
             }
         },
 
@@ -70,7 +70,7 @@ async fn main() -> io::Result<()> {
             if let Err(e) = res {
                 tracing::error!("{:?}", e)
             } else  {
-                tracing::info!("validator svc finished")
+                tracing::info!("validator finished")
             }
 
         }
