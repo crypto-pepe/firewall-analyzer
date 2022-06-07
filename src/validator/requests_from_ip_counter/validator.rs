@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
+use crate::validator::requests_from_ip_counter::state::StateError;
 use crate::validator::requests_from_ip_counter::{BanRule, BanRuleConfig};
 use crate::validator::Validator;
 
@@ -90,7 +91,7 @@ impl Validator for IPCount {
             .applied_rule_idx
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if state.apply_rule_if_possible(&self.rules, rule_idx, now)? {
+        if apply_rule_if_possible(state, &self.rules, rule_idx, now)? {
             let rule = self.rules[rule_idx];
             tracing::info!(
                 action = "ban",
@@ -466,4 +467,20 @@ mod tests {
             assert_eq!(ev, res)
         }
     }
+}
+
+fn apply_rule_if_possible(
+    state: &mut State,
+    rules: &[BanRule],
+    rule_idx: usize,
+    last_request_time: DateTime<Utc>,
+) -> Result<bool, StateError> {
+    let rule = rules.get(rule_idx).ok_or(StateError::NoRules(rule_idx))?;
+    if state.requests_since_last_ban >= rule.limit {
+        state.resets_at = last_request_time + rule.reset_duration;
+        state.requests_since_last_ban = 0;
+        state.applied_rule_idx = Some(rule_idx + 1);
+        return Ok(true);
+    }
+    Ok(false)
 }

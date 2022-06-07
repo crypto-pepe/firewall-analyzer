@@ -1,6 +1,6 @@
-use crate::validator::requests_from_ip_counter::{BanRule, StateError};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use circular_queue::CircularQueue;
+use thiserror::Error;
 
 #[derive(Debug)]
 pub(crate) struct State {
@@ -28,20 +28,10 @@ impl State {
         self.recent_requests.push(last_request_time);
         self.applied_rule_idx = None;
     }
+}
 
-    pub fn apply_rule_if_possible(
-        &mut self,
-        rules: &[BanRule],
-        rule_idx: usize,
-        last_request_time: DateTime<Utc>,
-    ) -> Result<bool, StateError> {
-        let rule = rules.get(rule_idx).ok_or(StateError::NoRules(rule_idx))?;
-        if self.requests_since_last_ban >= rule.limit {
-            self.resets_at = last_request_time + rule.reset_duration;
-            self.requests_since_last_ban = 0;
-            self.applied_rule_idx = Some(rule_idx + 1);
-            return Ok(true);
-        }
-        Ok(false)
-    }
+#[derive(Error, Debug)]
+pub enum StateError {
+    #[error("rule {0} not found")]
+    NoRules(usize),
 }
