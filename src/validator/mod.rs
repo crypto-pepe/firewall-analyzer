@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::ip_count::IPCount;
+use crate::validator::requests_from_ip_counter::IPCount;
 
 pub mod dummy;
-pub mod ip_count;
+pub mod requests_from_ip_counter;
 pub mod service;
 
 pub trait Validator {
@@ -19,7 +19,7 @@ pub trait Validator {
 pub enum Config {
     Dummy(dummy::Config),
     IpCount {
-        limits: Vec<ip_count::BanRuleConfig>,
+        limits: Vec<requests_from_ip_counter::BanRuleConfig>,
         ban_description: String,
     },
 }

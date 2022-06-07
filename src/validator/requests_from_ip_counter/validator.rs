@@ -7,22 +7,21 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
-use crate::validator::ip_count::{BanRule, BanRuleConfig};
+use crate::validator::requests_from_ip_counter::{BanRule, BanRuleConfig};
 use crate::validator::Validator;
 
 pub struct IPCount {
-    ban_desc: String,
+    ban_description: String,
     rules: Vec<BanRule>,
-    ip_data: HashMap<String, State>,
+    ip_ban_states: HashMap<String, State>,
 }
 
 impl IPCount {
-    pub fn new(rules: Vec<BanRuleConfig>, ban_desc: String) -> Self {
-        let ip_data = HashMap::new();
+    pub fn new(rules: Vec<BanRuleConfig>, ban_description: String) -> Self {
         IPCount {
             rules: rules.iter().map(|b| (*b).into()).collect(),
-            ban_desc,
-            ip_data,
+            ban_description,
+            ip_ban_states: HashMap::new(),
         }
     }
 
@@ -33,7 +32,7 @@ impl IPCount {
                 ip: Some(ip),
                 user_agent: None,
             },
-            reason: self.ban_desc.clone(),
+            reason: self.ban_description.clone(),
             ttl: self
                 .rules
                 .get(rule_idx)
@@ -50,27 +49,27 @@ impl Validator for IPCount {
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
         let rule = self.rules.get(0).expect("at least one rule required");
-        let mut data = self
-            .ip_data
+        let mut state = self
+            .ip_ban_states
             .entry(ip.clone())
             .or_insert_with(|| State::new(rule.limit as usize));
 
         let now = Utc::now();
 
-        // No ban now
-        if data.applied_rule_idx.is_none() {
-            data.recent_requests.push(now);
-            if !data.recent_requests.is_full() {
+        // Whether target is not banned
+        if state.applied_rule_idx.is_none() {
+            state.recent_requests.push(now);
+            if !state.recent_requests.is_full() {
                 return Ok(None);
             }
-            if *data.recent_requests.iter().last().unwrap() <= now - rule.reset_duration {
+            if *state.recent_requests.iter().last().unwrap() <= now - rule.reset_duration {
                 return Ok(None);
             }
 
-            data.resets_at = Utc::now() + rule.reset_duration;
-            data.recent_requests.clear();
-            data.requests_since_last_ban = 0;
-            data.applied_rule_idx = Some(0);
+            state.resets_at = Utc::now() + rule.reset_duration;
+            state.recent_requests.clear();
+            state.requests_since_last_ban = 0;
+            state.applied_rule_idx = Some(0);
 
             let rule = self.rules[0];
             tracing::info!(
@@ -84,19 +83,19 @@ impl Validator for IPCount {
 
         // was banned
 
-        if data.should_reset_timeout() {
-            data.reset(now);
+        if state.should_reset_timeout() {
+            state.reset(now);
             tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
         }
 
-        data.requests_since_last_ban += 1;
+        state.requests_since_last_ban += 1;
 
-        let rule_idx = data
+        let rule_idx = state
             .applied_rule_idx
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if data.apply_rule_if_possible(&self.rules, rule_idx, now) {
+        if state.apply_rule_if_possible(&self.rules, rule_idx, now)? {
             let rule = self.rules[rule_idx];
             tracing::info!(
                 action = "ban",
@@ -111,7 +110,7 @@ impl Validator for IPCount {
     }
 
     fn name(&self) -> String {
-        "ip_count".into()
+        "requests_from_ip_counter".into()
     }
 }
 
@@ -119,9 +118,10 @@ impl Validator for IPCount {
 mod tests {
     use anyhow::Error;
     use chrono::Duration;
+    use circular_queue::CircularQueue;
 
     use crate::model::{BanRequest, BanTarget, Request};
-    use crate::validator::ip_count::{BanRule, IPCount};
+    use crate::validator::requests_from_ip_counter::{BanRule, IPCount};
     use crate::validator::Validator;
 
     /// `get_default_validator` returns `IPCount` with
@@ -134,7 +134,7 @@ mod tests {
     /// 1 -> 4s ban, 8s reset
     fn get_default_validator() -> IPCount {
         IPCount {
-            ban_desc: "".to_string(),
+            ban_description: "".to_string(),
             rules: vec![
                 BanRule {
                     limit: 3,
@@ -152,7 +152,7 @@ mod tests {
                     reset_duration: Duration::seconds(8),
                 },
             ],
-            ip_data: Default::default(),
+            ip_ban_states: Default::default(),
         }
     }
 
@@ -189,7 +189,7 @@ mod tests {
                 },
                 reason: "".to_string(),
                 ttl: 1,
-                analyzer: "ip_count".to_string(),
+                analyzer: "requests_from_ip_counter".to_string(),
             }))),
             want_every: None,
         };
@@ -260,7 +260,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
             ]),
@@ -290,7 +290,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
                 Some(BanRequest {
@@ -300,7 +300,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 3,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -333,7 +333,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
                 Some(BanRequest {
@@ -343,7 +343,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -373,7 +373,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
                 None,
@@ -384,7 +384,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -415,7 +415,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
                 Some(BanRequest {
@@ -425,7 +425,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 3,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 Some(BanRequest {
                     target: BanTarget {
@@ -434,7 +434,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 4,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 Some(BanRequest {
                     target: BanTarget {
@@ -443,7 +443,7 @@ mod tests {
                     },
                     reason: "".to_string(),
                     ttl: 4,
-                    analyzer: "ip_count".to_string(),
+                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };

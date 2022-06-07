@@ -1,4 +1,4 @@
-use crate::validator::ip_count::BanRule;
+use crate::validator::requests_from_ip_counter::{BanRule, StateError};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use circular_queue::CircularQueue;
 
@@ -34,16 +34,14 @@ impl State {
         rules: &[BanRule],
         rule_idx: usize,
         last_request_time: DateTime<Utc>,
-    ) -> bool {
-        let rule = rules
-            .get(rule_idx)
-            .expect(&*format!("rule {} not found", rule_idx));
+    ) -> Result<bool, StateError> {
+        let rule = rules.get(rule_idx).ok_or(StateError::NoRules(rule_idx))?;
         if self.requests_since_last_ban >= rule.limit {
             self.resets_at = last_request_time + rule.reset_duration;
             self.requests_since_last_ban = 0;
             self.applied_rule_idx = Some(rule_idx + 1);
-            return true;
+            return Ok(true);
         }
-        false
+        Ok(false)
     }
 }
