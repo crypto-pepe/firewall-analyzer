@@ -18,18 +18,13 @@ pub trait Validator {
 #[serde(rename_all = "snake_case")]
 pub enum Config {
     Dummy(dummy::Config),
-    IpCount {
-        limits: Vec<requests_from_ip_counter::BanRuleConfig>,
-        ban_description: String,
-    },
+    #[serde(rename = "requests_from_ip_count")]
+    RequestsFromIPCount(requests_from_ip_counter::Config),
 }
 
 pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
     match cfg {
         Config::Dummy(cfg) => Box::new(DummyValidator::new(cfg)),
-        Config::IpCount {
-            limits,
-            ban_description,
-        } => Box::new(RequestsFromIpCounter::new(limits, ban_description)),
+        Config::RequestsFromIPCount(cfg) => Box::new(RequestsFromIpCounter::new(cfg)),
     }
 }

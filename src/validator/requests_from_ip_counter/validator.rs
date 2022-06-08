@@ -7,9 +7,10 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
+use crate::validator::requests_from_ip_counter::config::Config;
 use crate::validator::requests_from_ip_counter::state::RulesError;
 use crate::validator::requests_from_ip_counter::state::RulesError::NotFound;
-use crate::validator::requests_from_ip_counter::{BanRule, BanRuleConfig};
+use crate::validator::requests_from_ip_counter::BanRule;
 use crate::validator::Validator;
 
 pub struct RequestsFromIpCounter {
@@ -19,10 +20,10 @@ pub struct RequestsFromIpCounter {
 }
 
 impl RequestsFromIpCounter {
-    pub fn new(rules: Vec<BanRuleConfig>, ban_description: String) -> Self {
+    pub fn new(cfg: Config) -> Self {
         RequestsFromIpCounter {
-            rules: rules.iter().map(|b| (*b).into()).collect(),
-            ban_description,
+            rules: cfg.limits.iter().map(|b| (*b).into()).collect(),
+            ban_description: cfg.ban_description,
             ip_ban_states: HashMap::new(),
         }
     }
@@ -109,6 +110,22 @@ impl Validator for RequestsFromIpCounter {
     fn name(&self) -> String {
         "requests_from_ip_counter".into()
     }
+}
+
+fn apply_rule_if_possible(
+    state: &mut State,
+    rules: &[BanRule],
+    rule_idx: usize,
+    last_request_time: DateTime<Utc>,
+) -> Result<bool, RulesError> {
+    let rule = rules.get(rule_idx).ok_or(NotFound(rule_idx))?;
+    if state.requests_since_last_ban >= rule.limit {
+        state.resets_at = last_request_time + rule.reset_duration;
+        state.requests_since_last_ban = 0;
+        state.applied_rule_idx = Some(rule_idx + 1);
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 #[cfg(test)]
@@ -468,20 +485,4 @@ mod tests {
             assert_eq!(ev, res)
         }
     }
-}
-
-fn apply_rule_if_possible(
-    state: &mut State,
-    rules: &[BanRule],
-    rule_idx: usize,
-    last_request_time: DateTime<Utc>,
-) -> Result<bool, RulesError> {
-    let rule = rules.get(rule_idx).ok_or(NotFound(rule_idx))?;
-    if state.requests_since_last_ban >= rule.limit {
-        state.resets_at = last_request_time + rule.reset_duration;
-        state.requests_since_last_ban = 0;
-        state.applied_rule_idx = Some(rule_idx + 1);
-        return Ok(true);
-    }
-    Ok(false)
 }
