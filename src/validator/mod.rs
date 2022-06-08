@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::requests_from_ip_counter::IPCount;
+use crate::validator::requests_from_ip_counter::RequestsFromIpCounter;
 
 pub mod dummy;
 pub mod requests_from_ip_counter;
@@ -30,6 +30,6 @@ pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
         Config::IpCount {
             limits,
             ban_description,
-        } => Box::new(IPCount::new(limits, ban_description)),
+        } => Box::new(RequestsFromIpCounter::new(limits, ban_description)),
     }
 }

@@ -31,7 +31,7 @@ impl State {
 }
 
 #[derive(Error, Debug)]
-pub enum StateError {
+pub enum RulesError {
     #[error("rule {0} not found")]
-    NoRules(usize),
+    NotFound(usize),
 }

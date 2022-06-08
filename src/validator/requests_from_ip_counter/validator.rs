@@ -7,19 +7,20 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
-use crate::validator::requests_from_ip_counter::state::StateError;
+use crate::validator::requests_from_ip_counter::state::RulesError;
+use crate::validator::requests_from_ip_counter::state::RulesError::NotFound;
 use crate::validator::requests_from_ip_counter::{BanRule, BanRuleConfig};
 use crate::validator::Validator;
 
-pub struct IPCount {
+pub struct RequestsFromIpCounter {
     ban_description: String,
     rules: Vec<BanRule>,
     ip_ban_states: HashMap<String, State>,
 }
 
-impl IPCount {
+impl RequestsFromIpCounter {
     pub fn new(rules: Vec<BanRuleConfig>, ban_description: String) -> Self {
-        IPCount {
+        RequestsFromIpCounter {
             rules: rules.iter().map(|b| (*b).into()).collect(),
             ban_description,
             ip_ban_states: HashMap::new(),
@@ -40,11 +41,11 @@ impl IPCount {
     }
 }
 
-impl Validator for IPCount {
+impl Validator for RequestsFromIpCounter {
     #[tracing::instrument(skip(self))]
     fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
-        let rule = self.rules.get(0).expect("at least one rule required");
+        let rule = self.rules.get(0).ok_or(NotFound(0))?;
         let mut state = self
             .ip_ban_states
             .entry(ip.clone())
@@ -117,7 +118,7 @@ mod tests {
     use circular_queue::CircularQueue;
 
     use crate::model::{BanRequest, BanTarget, Request};
-    use crate::validator::requests_from_ip_counter::{BanRule, IPCount};
+    use crate::validator::requests_from_ip_counter::{BanRule, RequestsFromIpCounter};
     use crate::validator::Validator;
 
     /// `get_default_validator` returns `IPCount` with
@@ -128,8 +129,8 @@ mod tests {
     /// 2 -> 3s ban, 6s reset
     ///
     /// 1 -> 4s ban, 8s reset
-    fn get_default_validator() -> IPCount {
-        IPCount {
+    fn get_default_validator() -> RequestsFromIpCounter {
+        RequestsFromIpCounter {
             ban_description: "".to_string(),
             rules: vec![
                 BanRule {
@@ -474,8 +475,8 @@ fn apply_rule_if_possible(
     rules: &[BanRule],
     rule_idx: usize,
     last_request_time: DateTime<Utc>,
-) -> Result<bool, StateError> {
-    let rule = rules.get(rule_idx).ok_or(StateError::NoRules(rule_idx))?;
+) -> Result<bool, RulesError> {
+    let rule = rules.get(rule_idx).ok_or(NotFound(rule_idx))?;
     if state.requests_since_last_ban >= rule.limit {
         state.resets_at = last_request_time + rule.reset_duration;
         state.requests_since_last_ban = 0;
