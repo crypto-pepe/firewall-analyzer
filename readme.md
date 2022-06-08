@@ -25,7 +25,7 @@
 
 # Validators
 
-### Dummy (testing validator)
+### dummy (testing validator)
 
 #### Config
 
@@ -33,6 +33,17 @@
 |---------|--------|---------|----------|----------------------------------------|
 | idx     | int    |         | Yes      | id of validator                        |
 | ban_ttl | string | 120s    | No       | TTL for banned target. Duration string |
+
+### requests_from_ip_count
+
+#### Config
+
+| Name                  | Type   | Default | Required | Note                                        |
+|-----------------------|--------|---------|----------|---------------------------------------------|
+| ban_description       | string |         | Yes      | Reason sending to executor                  |
+| limits.limit          | int    |         | Yes      | Count of requests allowed on current limit  |
+| limits.ban_duration   | string |         | Yes      | TTL for banned target. Duration string      |
+| limits.reset_duration | string |         | Yes      | Duration for resetting ban. Duration string |
 
 ## Writing your own validator
 
@@ -42,9 +53,10 @@ Inside of `src/validator/mod.rs` add your validator and its parameters to `Confi
 
 ```rust
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum Config {
     Dummy(dummy::Config),
+    MyNewValidator(my_new_validator::Config),
 }
 ```
 
@@ -52,9 +64,10 @@ Then add creating of your validator to `get_validator`
 
 ```rust
 pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
-    Box::new(match cfg {
-        Config::Dummy(cfg) => DummyValidator::new(cfg),
-    })
+    match cfg {
+        Config::Dummy(cfg) => Box::new(DummyValidator::new(cfg)),
+        Config::MyNewValidator(cfg) => Box::new(MyNewValidator::new(cfg)),
+    }
 }
 ```
 
