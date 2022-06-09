@@ -131,11 +131,11 @@ fn apply_rule_if_possible(
 mod tests {
     use anyhow::Error;
     use chrono::Duration;
-    use circular_queue::CircularQueue;
 
     use crate::model::{BanTarget, Request, ValidatorBanRequest};
-    use crate::validation_provider::requests_from_ip_counter::{BanRule, RequestsFromIPCounter};
     use crate::validation_provider::Validator;
+    use crate::validators::requests_from_ip_counter::BanRule;
+    use crate::validators::RequestsFromIPCounter;
 
     /// `get_default_validator` returns `IPCount` with
     /// next limits:
