@@ -8,8 +8,8 @@ use super::state::State;
 
 use crate::model::{BanTarget, Request, ValidatorBanRequest};
 use crate::validation_provider::Validator;
-use crate::validators::requests_from_ip_counter::state::RulesError;
-use crate::validators::requests_from_ip_counter::state::RulesError::NotFound;
+use crate::validators::requests_from_ip_counter::error::RulesError;
+use crate::validators::requests_from_ip_counter::error::RulesError::NotFound;
 use crate::validators::requests_from_ip_counter::BanRule;
 use crate::validators::requests_from_ip_counter::Config;
 

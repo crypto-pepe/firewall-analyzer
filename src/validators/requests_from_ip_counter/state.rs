@@ -1,6 +1,5 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 use circular_queue::CircularQueue;
-use thiserror::Error;
 
 #[derive(Debug)]
 pub(crate) struct State {
@@ -28,10 +27,4 @@ impl State {
         self.recent_requests.push(last_request_time);
         self.applied_rule_idx = None;
     }
-}
-
-#[derive(Error, Debug)]
-pub enum RulesError {
-    #[error("rule {0} not found")]
-    NotFound(usize),
 }
