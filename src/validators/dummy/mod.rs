@@ -41,7 +41,7 @@ impl Validator for Dummy {
                 },
                 reason: format!("Validator has {} id", self.idx),
                 ttl: self.ban_duration.as_secs() as u32,
-                analyzer: self.name(),
+                analyzer: String::new(),
             }));
         }
         Ok(None)

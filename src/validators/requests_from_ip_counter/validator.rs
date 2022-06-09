@@ -37,7 +37,7 @@ impl RequestsFromIPCounter {
             },
             reason: self.ban_description.clone(),
             ttl,
-            analyzer: self.name(),
+            analyzer: String::new(),
         }
     }
 }
