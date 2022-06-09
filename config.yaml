@@ -1,0 +1,18 @@
+kafka:
+  brokers:
+    - 'localhost:9093'
+  topics:
+    - 'some-topic'
+  group: 'some-group'
+  client_id: 'some-client'
+forwarder:
+  url: "http://localhost:8001/api/bans"
+validators:
+  - dummy:
+      idx: 0
+  - dummy:
+      idx: 1
+  - dummy:
+      idx: 2
+telemetry:
+  svc_name: "firewall-analyzer"
