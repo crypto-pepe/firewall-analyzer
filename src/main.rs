@@ -10,7 +10,7 @@ mod error;
 mod forwarder;
 mod model;
 mod telemetry;
-mod validator_provider;
+mod validation_provider;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -32,9 +32,9 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map(validator_provider::get_validator)
+        .map(validation_provider::get_validator)
         .collect();
-    let mut validator_svc = validator_provider::service::Service::from_validators(validators);
+    let mut validator_svc = validation_provider::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);

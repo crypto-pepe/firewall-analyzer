@@ -1,6 +1,6 @@
 use crate::model;
 use crate::model::{BanTarget, Request};
-use crate::validator_provider::Validator;
+use crate::validation_provider::Validator;
 use pepe_config::DurationString;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
