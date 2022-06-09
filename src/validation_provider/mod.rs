@@ -10,7 +10,7 @@ pub mod requests_from_ip_counter;
 pub mod service;
 
 pub trait Validator {
-    fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error>;
+    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>>;
     fn name(&self) -> String;
 }
 

@@ -49,7 +49,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                 }
             };
 
-            let stream = stream::iter(mss.iter().map::<Result<MessageSet, anyhow::Error>, _>(Ok));
+            let stream = stream::iter(mss.iter().map::<anyhow::Result<MessageSet>, _>(Ok));
 
             stream
                 .try_for_each(|ms| async {
