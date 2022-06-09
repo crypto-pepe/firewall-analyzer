@@ -20,7 +20,7 @@ pub struct Config {
 
 impl Dummy {
     pub fn new(cfg: Config) -> Self {
-        Dummy {
+        Self {
             idx: cfg.idx,
             ban_duration: {
                 cfg.ban_duration

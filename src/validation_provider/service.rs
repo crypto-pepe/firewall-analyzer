@@ -12,8 +12,8 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>) -> Service {
-        Service { validators: vv }
+    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>) -> Self {
+        Self { validators: vv }
     }
 
     pub async fn run(

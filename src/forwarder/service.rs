@@ -10,7 +10,7 @@ pub struct Service {
 
 impl Service {
     pub fn new(c: Box<dyn ExecutorClient + Send + Sync>) -> Self {
-        Service { client: c }
+        Self { client: c }
     }
 
     pub async fn run(&self, mut recv: Receiver<BanRequest>) {

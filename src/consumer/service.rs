@@ -31,7 +31,7 @@ impl KafkaRequestConsumer {
             .fold(consumer, |c, t| c.with_topic(t.to_string()));
 
         let consumer = consumer.create()?;
-        Ok(KafkaRequestConsumer { consumer })
+        Ok(Self { consumer })
     }
 }
 

@@ -17,7 +17,7 @@ pub struct BanRule {
 
 impl From<BanRuleConfig> for BanRule {
     fn from(brc: BanRuleConfig) -> Self {
-        BanRule {
+        Self {
             limit: brc.limit,
             ban_duration: chrono::Duration::from_std(brc.ban_duration.into()).unwrap(),
             reset_duration: chrono::Duration::from_std(brc.reset_duration.into()).unwrap(),

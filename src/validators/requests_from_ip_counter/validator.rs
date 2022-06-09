@@ -21,7 +21,7 @@ pub struct RequestsFromIPCounter {
 
 impl RequestsFromIPCounter {
     pub fn new(cfg: Config) -> Self {
-        RequestsFromIPCounter {
+        Self {
             rules: cfg.limits.iter().map(|b| (*b).into()).collect(),
             ban_description: cfg.ban_description,
             ip_ban_states: HashMap::new(),

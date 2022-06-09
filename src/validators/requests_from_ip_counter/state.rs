@@ -12,7 +12,7 @@ pub(crate) struct State {
 
 impl State {
     pub fn new(requests_limit: usize) -> Self {
-        State {
+        Self {
             requests_since_last_ban: 0,
             applied_rule_idx: None,
             recent_requests: CircularQueue::with_capacity(requests_limit),
