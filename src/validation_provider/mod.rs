@@ -7,7 +7,7 @@ use crate::validators::{dummy, requests_from_ip_counter, RequestsFromIPCounter};
 pub mod service;
 
 pub trait Validator {
-    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>>;
+    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::ValidatorBanRequest>>;
     fn name(&self) -> String;
 }
 

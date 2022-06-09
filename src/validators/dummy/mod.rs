@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 // USE ONLY FOR TESTING
-// Dummy prints request and if dummy's idx is odd - bans ip for ban_ttl_secs or 120s, if not stated
+// Dummy prints request and if dummy's idx is odd - bans ip for ban_duration or 120s, if not stated
 pub struct Dummy {
     pub idx: u16,
     pub ban_duration: Duration,
@@ -32,16 +32,15 @@ impl Dummy {
 }
 impl Validator for Dummy {
     #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>> {
+    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::ValidatorBanRequest>> {
         if self.idx % 2 == 1 {
-            return Ok(Some(model::BanRequest {
+            return Ok(Some(model::ValidatorBanRequest {
                 target: BanTarget {
                     ip: Some(req.remote_ip),
                     user_agent: None,
                 },
                 reason: format!("Validator has {} id", self.idx),
                 ttl: self.ban_duration.as_secs() as u32,
-                analyzer: String::new(),
             }));
         }
         Ok(None)

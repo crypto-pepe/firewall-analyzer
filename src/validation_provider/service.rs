@@ -13,8 +13,14 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>, analyzer_prefix: String) -> Self {
-        Self { validators: vv, analyzer_prefix }
+    pub fn from_validators(
+        vv: Vec<Box<dyn Validator + Sync + Send>>,
+        analyzer_prefix: String,
+    ) -> Self {
+        Self {
+            validators: vv,
+            analyzer_prefix,
+        }
     }
 
     pub async fn run(
@@ -38,10 +44,14 @@ impl Service {
                 let res = v.validate(r.clone());
                 match res {
                     Ok(obr) => match obr {
-                        Some(mut s) => {
-                            s.analyzer = format!("{}:{}", self.analyzer_prefix, v.name());
-                            tracing::info!("ban: {:?}", s);
-                            Some(send.send(s))
+                        Some(validator_ban_request) => {
+                            let ban_request = BanRequest {
+                                validator_ban_request,
+                                analyzer: format!("{}:{}", self.analyzer_prefix, v.name()),
+                            };
+                            println!("{}", serde_json::to_string(&ban_request).unwrap());
+                            tracing::info!("ban: {:?}", ban_request);
+                            Some(send.send(ban_request))
                         }
                         None => None,
                     },

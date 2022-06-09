@@ -6,7 +6,7 @@ use chrono::prelude::*;
 
 use super::state::State;
 
-use crate::model::{BanRequest, BanTarget, Request};
+use crate::model::{BanTarget, Request, ValidatorBanRequest};
 use crate::validation_provider::Validator;
 use crate::validators::requests_from_ip_counter::state::RulesError;
 use crate::validators::requests_from_ip_counter::state::RulesError::NotFound;
@@ -29,22 +29,21 @@ impl RequestsFromIPCounter {
     }
 
     #[tracing::instrument(skip(self))]
-    fn ban(&self, ttl: u32, ip: String) -> BanRequest {
-        BanRequest {
+    fn ban(&self, ttl: u32, ip: String) -> ValidatorBanRequest {
+        ValidatorBanRequest {
             target: BanTarget {
                 ip: Some(ip),
                 user_agent: None,
             },
             reason: self.ban_description.clone(),
             ttl,
-            analyzer: String::new(),
         }
     }
 }
 
 impl Validator for RequestsFromIPCounter {
     #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
+    fn validate(&mut self, req: Request) -> Result<Option<ValidatorBanRequest>, Error> {
         let ip = req.remote_ip;
         let rule = self.rules.get(0).ok_or(NotFound(0))?;
         let mut state = self
@@ -134,7 +133,7 @@ mod tests {
     use chrono::Duration;
     use circular_queue::CircularQueue;
 
-    use crate::model::{BanRequest, BanTarget, Request};
+    use crate::model::{BanTarget, Request, ValidatorBanRequest};
     use crate::validation_provider::requests_from_ip_counter::{BanRule, RequestsFromIPCounter};
     use crate::validation_provider::Validator;
 
@@ -173,8 +172,8 @@ mod tests {
     pub struct TestCase {
         //request, sleep before request
         pub input: Vec<(Request, Duration)>,
-        pub want_last: Option<Result<Option<BanRequest>, Error>>,
-        pub want_every: Option<Vec<Option<BanRequest>>>,
+        pub want_last: Option<Result<Option<ValidatorBanRequest>, Error>>,
+        pub want_every: Option<Vec<Option<ValidatorBanRequest>>>,
     }
 
     fn req_with_ip(ip: &str) -> Request {
@@ -196,14 +195,13 @@ mod tests {
                 (req_with_ip("1.1.1.1"), Duration::seconds(0)),
                 (req_with_ip("1.1.1.1"), Duration::seconds(0)),
             ],
-            want_last: Some(Ok(Some(BanRequest {
+            want_last: Some(Ok(Some(ValidatorBanRequest {
                 target: BanTarget {
                     ip: Some("1.1.1.1".to_string()),
                     user_agent: None,
                 },
                 reason: "".to_string(),
                 ttl: 1,
-                analyzer: "requests_from_ip_counter".to_string(),
             }))),
             want_every: None,
         };
@@ -267,14 +265,13 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
             ]),
@@ -297,24 +294,22 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 3,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -340,24 +335,22 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("3.3.3.3".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -380,25 +373,23 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
@@ -422,42 +413,38 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 1,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
                 None,
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 3,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 4,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
-                Some(BanRequest {
+                Some(ValidatorBanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
                     },
                     reason: "".to_string(),
                     ttl: 4,
-                    analyzer: "requests_from_ip_counter".to_string(),
                 }),
             ]),
         };
