@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::model;
 use crate::model::Request;
-use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::requests_from_ip_counter::RequestsFromIPCounter;
+use crate::validator_provider::dummy::Dummy as DummyValidator;
+use crate::validator_provider::requests_from_ip_counter::RequestsFromIPCounter;
 
 pub mod dummy;
 pub mod requests_from_ip_counter;

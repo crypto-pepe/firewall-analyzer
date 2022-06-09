@@ -5,7 +5,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use crate::error::ProcessingError;
 use crate::model;
 use crate::model::BanRequest;
-use crate::validator::Validator;
+use crate::validator_provider::Validator;
 
 pub struct Service {
     pub validators: Vec<Box<dyn Validator + Sync + Send>>,
@@ -49,14 +49,14 @@ impl Service {
                     }
                 }
             });
-            if let Err(e) = join_all(handles)
+            join_all(handles)
                 .await
                 .into_iter()
                 .collect::<Result<(), _>>()
-            {
-                tracing::error!("{:?}", e);
-                return Err(ProcessingError::ChannelUnavailable(e));
-            };
+                .map_err(|e| {
+                    tracing::error!("{:?}", e);
+                    ProcessingError::ChannelUnavailable(e)
+                })?;
         }
     }
 }

@@ -7,11 +7,11 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
-use crate::validator::requests_from_ip_counter::config::Config;
-use crate::validator::requests_from_ip_counter::state::RulesError;
-use crate::validator::requests_from_ip_counter::state::RulesError::NotFound;
-use crate::validator::requests_from_ip_counter::BanRule;
-use crate::validator::Validator;
+use crate::validator_provider::requests_from_ip_counter::config::Config;
+use crate::validator_provider::requests_from_ip_counter::state::RulesError;
+use crate::validator_provider::requests_from_ip_counter::state::RulesError::NotFound;
+use crate::validator_provider::requests_from_ip_counter::BanRule;
+use crate::validator_provider::Validator;
 
 pub struct RequestsFromIPCounter {
     ban_description: String,
@@ -135,8 +135,8 @@ mod tests {
     use circular_queue::CircularQueue;
 
     use crate::model::{BanRequest, BanTarget, Request};
-    use crate::validator::requests_from_ip_counter::{BanRule, RequestsFromIPCounter};
-    use crate::validator::Validator;
+    use crate::validator_provider::requests_from_ip_counter::{BanRule, RequestsFromIPCounter};
+    use crate::validator_provider::Validator;
 
     /// `get_default_validator` returns `IPCount` with
     /// next limits:
