@@ -14,11 +14,11 @@ pub struct Service {
 
 impl Service {
     pub fn from_validators(
-        vv: Vec<Box<dyn Validator + Sync + Send>>,
+        validators: Vec<Box<dyn Validator + Sync + Send>>,
         analyzer_prefix: String,
     ) -> Self {
         Self {
-            validators: vv,
+            validators,
             analyzer_prefix,
         }
     }
@@ -49,7 +49,6 @@ impl Service {
                                 validator_ban_request,
                                 analyzer: format!("{}:{}", self.analyzer_prefix, v.name()),
                             };
-                            println!("{}", serde_json::to_string(&ban_request).unwrap());
                             tracing::info!("ban: {:?}", ban_request);
                             Some(send.send(ban_request))
                         }

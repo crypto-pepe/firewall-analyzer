@@ -34,7 +34,8 @@ async fn main() -> io::Result<()> {
         .validators
         .into_iter()
         .map(validation_provider::get_validator)
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .expect("setup validators");
     let mut validator_svc =
         validation_provider::service::Service::from_validators(validators, cfg.analyzer_prefix);
 

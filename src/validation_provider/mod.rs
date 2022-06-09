@@ -19,9 +19,9 @@ pub enum Config {
     RequestsFromIPCounter(requests_from_ip_counter::Config),
 }
 
-pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
-    match cfg {
-        Config::Dummy(cfg) => Box::new(Dummy::new(cfg)),
-        Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIPCounter::new(cfg)),
-    }
+pub fn get_validator(cfg: Config) -> anyhow::Result<Box<dyn Validator + Sync + Send>> {
+    Ok(match cfg {
+        Config::Dummy(cfg) => Box::new(Dummy::new(cfg)?),
+        Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIPCounter::new(cfg)?),
+    })
 }

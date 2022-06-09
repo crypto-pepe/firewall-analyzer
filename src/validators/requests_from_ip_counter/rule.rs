@@ -15,12 +15,14 @@ pub struct BanRule {
     pub reset_duration: chrono::Duration,
 }
 
-impl From<BanRuleConfig> for BanRule {
-    fn from(brc: BanRuleConfig) -> Self {
-        Self {
+impl TryFrom<BanRuleConfig> for BanRule {
+    type Error = anyhow::Error;
+
+    fn try_from(brc: BanRuleConfig) -> Result<Self, Self::Error> {
+        Ok(Self {
             limit: brc.limit,
-            ban_duration: chrono::Duration::from_std(brc.ban_duration.into()).unwrap(),
-            reset_duration: chrono::Duration::from_std(brc.reset_duration.into()).unwrap(),
-        }
+            ban_duration: chrono::Duration::from_std(brc.ban_duration.into())?,
+            reset_duration: chrono::Duration::from_std(brc.reset_duration.into())?,
+        })
     }
 }

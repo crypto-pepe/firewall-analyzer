@@ -9,7 +9,6 @@ use super::state::State;
 use crate::model::{BanTarget, Request, ValidatorBanRequest};
 use crate::validation_provider::Validator;
 use crate::validators::requests_from_ip_counter::error::RulesError;
-use crate::validators::requests_from_ip_counter::error::RulesError::NotFound;
 use crate::validators::requests_from_ip_counter::BanRule;
 use crate::validators::requests_from_ip_counter::Config;
 
@@ -20,12 +19,16 @@ pub struct RequestsFromIPCounter {
 }
 
 impl RequestsFromIPCounter {
-    pub fn new(cfg: Config) -> Self {
-        Self {
-            rules: cfg.limits.iter().map(|b| (*b).into()).collect(),
+    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+        Ok(Self {
+            rules: cfg
+                .limits
+                .iter()
+                .map(|b| (*b).try_into())
+                .collect::<Result<Vec<_>, _>>()?,
             ban_description: cfg.ban_description,
             ip_ban_states: HashMap::new(),
-        }
+        })
     }
 
     #[tracing::instrument(skip(self))]
@@ -45,7 +48,7 @@ impl Validator for RequestsFromIPCounter {
     #[tracing::instrument(skip(self))]
     fn validate(&mut self, req: Request) -> Result<Option<ValidatorBanRequest>, Error> {
         let ip = req.remote_ip;
-        let rule = self.rules.get(0).ok_or(NotFound(0))?;
+        let rule = self.rules.get(0).ok_or(RulesError::NotFound(0))?;
         let mut state = self
             .ip_ban_states
             .entry(ip.clone())
@@ -117,7 +120,7 @@ fn apply_rule_if_possible(
     rule_idx: usize,
     last_request_time: DateTime<Utc>,
 ) -> Result<bool, RulesError> {
-    let rule = rules.get(rule_idx).ok_or(NotFound(rule_idx))?;
+    let rule = rules.get(rule_idx).ok_or(RulesError::NotFound(rule_idx))?;
     if state.requests_since_last_ban >= rule.limit {
         state.resets_at = last_request_time + rule.reset_duration;
         state.requests_since_last_ban = 0;

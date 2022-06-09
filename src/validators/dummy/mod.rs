@@ -19,15 +19,15 @@ pub struct Config {
 }
 
 impl Dummy {
-    pub fn new(cfg: Config) -> Self {
-        Self {
+    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+        Ok(Self {
             idx: cfg.idx,
             ban_duration: {
                 cfg.ban_duration
                     .unwrap_or_else(|| DurationString::from(Duration::from_secs(120)))
                     .into()
             },
-        }
+        })
     }
 }
 impl Validator for Dummy {
