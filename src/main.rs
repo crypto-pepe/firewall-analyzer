@@ -32,9 +32,9 @@ async fn main() -> io::Result<()> {
     let validators = cfg
         .validators
         .into_iter()
-        .map( validator::get_validator)
+        .map(validator::get_validator)
         .collect();
-    let validator_svc = validator::service::Service::from_validators(validators);
+    let mut validator_svc = validator::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::BanRequest>(5);

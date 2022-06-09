@@ -34,7 +34,7 @@ impl Dummy {
 }
 impl Validator for Dummy {
     #[tracing::instrument(skip(self))]
-    fn validate(&self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error> {
+    fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>, anyhow::Error> {
         if self.idx % 2 == 1 {
             return Ok(Some(model::BanRequest {
                 target: BanTarget {

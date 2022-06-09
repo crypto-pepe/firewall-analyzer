@@ -17,7 +17,7 @@ impl Service {
     }
 
     pub async fn run(
-        &self,
+        &mut self,
         mut recv: Receiver<model::Request>,
         send: Sender<BanRequest>,
     ) -> Result<(), ProcessingError<BanRequest>> {
@@ -33,7 +33,7 @@ impl Service {
                 },
             };
 
-            let handles = self.validators.iter().filter_map(|v| {
+            let handles = self.validators.iter_mut().filter_map(|v| {
                 let res = v.validate(r.clone());
                 match res {
                     Ok(obr) => match obr {
