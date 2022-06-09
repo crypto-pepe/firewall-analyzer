@@ -11,6 +11,7 @@ mod forwarder;
 mod model;
 mod telemetry;
 mod validation_provider;
+mod validators;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {

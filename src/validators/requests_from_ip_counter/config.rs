@@ -1,4 +1,4 @@
-use crate::validation_provider::requests_from_ip_counter;
+use crate::validators::requests_from_ip_counter;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

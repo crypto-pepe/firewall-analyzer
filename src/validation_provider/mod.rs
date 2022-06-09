@@ -2,11 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::model;
 use crate::model::Request;
-use crate::validation_provider::dummy::Dummy as DummyValidator;
-use crate::validation_provider::requests_from_ip_counter::RequestsFromIPCounter;
-
-pub mod dummy;
-pub mod requests_from_ip_counter;
+use crate::validators::Dummy;
+use crate::validators::{dummy, requests_from_ip_counter, RequestsFromIPCounter};
 pub mod service;
 
 pub trait Validator {
@@ -24,7 +21,7 @@ pub enum Config {
 
 pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
     match cfg {
-        Config::Dummy(cfg) => Box::new(DummyValidator::new(cfg)),
+        Config::Dummy(cfg) => Box::new(Dummy::new(cfg)),
         Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIPCounter::new(cfg)),
     }
 }

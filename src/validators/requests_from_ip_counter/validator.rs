@@ -7,11 +7,11 @@ use chrono::prelude::*;
 use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
-use crate::validation_provider::requests_from_ip_counter::config::Config;
-use crate::validation_provider::requests_from_ip_counter::state::RulesError;
-use crate::validation_provider::requests_from_ip_counter::state::RulesError::NotFound;
-use crate::validation_provider::requests_from_ip_counter::BanRule;
 use crate::validation_provider::Validator;
+use crate::validators::requests_from_ip_counter::state::RulesError;
+use crate::validators::requests_from_ip_counter::state::RulesError::NotFound;
+use crate::validators::requests_from_ip_counter::BanRule;
+use crate::validators::requests_from_ip_counter::Config;
 
 pub struct RequestsFromIPCounter {
     ban_description: String,

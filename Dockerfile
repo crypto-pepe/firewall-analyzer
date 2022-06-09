@@ -8,13 +8,13 @@ RUN apk add --no-cache musl-dev openssl openssl-dev cmake make g++
 
 # build dependecies (cache)
 COPY Cargo.toml ./
-RUN echo "fn main() {}" > dummy.rs && sed -i 's#src/main.rs#dummy.rs#' Cargo.toml
+RUN echo "fn main() {}" > mod && sed -i 's#src/main.rs#mod#' Cargo.toml
 RUN cargo build --release
 
 # build app
 COPY ./src ./src
 COPY ./config.yaml ./
-RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
+RUN sed -i 's#mod#src/main.rs#' Cargo.toml
 RUN cargo build --release
 
 
