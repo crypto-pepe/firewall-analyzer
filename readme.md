@@ -47,9 +47,9 @@
 
 ## Writing your own validator
 
-Inside of `src/validator/` create module with your validator and implement `Validator` trait from `src/validator/mod.rs`.
+Inside of `src/validation_provider/` create module with your validator and implement `Validator` trait from `src/validation_provider/mod.rs`.
 
-Inside of `src/validator/mod.rs` add your validator and its parameters to `Config` enum
+Inside of `src/validation_provider/mod.rs` add your validator and its parameters to `Config` enum
 
 ```rust
 #[derive(Clone, Debug, Serialize, Deserialize)]
