@@ -23,6 +23,18 @@
 | validators               | []object |         | Yes      | List of validator configs. See **Validators**                                                                    |
 | dry_run                  | bool     | false   | No       | Run firewall-analyzer in dry run mode                                                                            |
 | analyzer_prefix          | string   |         | Yes      | Prefix that will be added to analyzer id header                                                                  |
+___
+
+Each of the configuration parameter can be overridden via the environment variable. Nested values overriding are
+supported via the '.' separator.
+
+Example:
+
+| Parameter name | Env. variable |
+|----------------|---------------|
+| some_field     | SOME_FIELD    |
+| server.port    | SERVER.PORT   |
+
 
 # Validators
 
@@ -48,9 +60,9 @@
 
 ## Writing your own validator
 
-Inside of `src/validation_provider/` create module with your validator and implement `Validator` trait from `src/validation_provider/mod.rs`.
+Inside of `src/validators/` create module with your validator and implement `Validator` trait from `src/validation_provider/mod.rs`.
 
-Inside of `src/validation_provider/mod.rs` add your validator and its parameters to `Config` enum
+Inside of `src/validation_provider/mod.rs` add your validator's config to `Config` enum
 
 ```rust
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -71,15 +83,3 @@ pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
     }
 }
 ```
-
-___
-
-Each of the configuration parameter can be overridden via the environment variable. Nested values overriding are
-supported via the '.' separator.
-
-Example:
-
-| Parameter name | Env. variable |
-|----------------|---------------|
-| some_field     | SOME_FIELD    |
-| server.port    | SERVER.PORT   |
