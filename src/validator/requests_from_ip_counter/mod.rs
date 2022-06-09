@@ -1,6 +1,6 @@
 pub(crate) use rule::BanRule;
 pub use rule::BanRuleConfig;
-pub use validator::RequestsFromIpCounter;
+pub use validator::RequestsFromIPCounter;
 pub mod config;
 mod rule;
 mod state;

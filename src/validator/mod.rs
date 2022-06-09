@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::model;
 use crate::model::Request;
 use crate::validator::dummy::Dummy as DummyValidator;
-use crate::validator::requests_from_ip_counter::RequestsFromIpCounter;
+use crate::validator::requests_from_ip_counter::RequestsFromIPCounter;
 
 pub mod dummy;
 pub mod requests_from_ip_counter;
@@ -25,6 +25,6 @@ pub enum Config {
 pub fn get_validator(cfg: Config) -> Box<dyn Validator + Sync + Send> {
     match cfg {
         Config::Dummy(cfg) => Box::new(DummyValidator::new(cfg)),
-        Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIpCounter::new(cfg)),
+        Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIPCounter::new(cfg)),
     }
 }
