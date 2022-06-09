@@ -20,5 +20,6 @@ validators:
         - limit: 1
           ban_duration: 60s
           reset_duration: 120s
+analyzer_prefix: "analyzer-1"
 telemetry:
   svc_name: "firewall-analyzer"

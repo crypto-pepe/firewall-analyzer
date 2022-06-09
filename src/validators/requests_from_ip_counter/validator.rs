@@ -108,7 +108,7 @@ impl Validator for RequestsFromIPCounter {
     }
 
     fn name(&self) -> String {
-        "requests_from_ip_counter".into()
+        "requests-from-ip-counter".into()
     }
 }
 

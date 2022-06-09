@@ -8,6 +8,7 @@ pub struct Config {
     pub kafka: pepe_config::kafka::consumer::Config,
     pub forwarder: forwarder::http_client::Config,
     pub telemetry: telemetry::Config,
+    pub analyzer_prefix: String,
     pub validators: Vec<validation_provider::Config>,
     #[serde(default)]
     pub dry_run: bool,

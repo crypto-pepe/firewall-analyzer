@@ -22,6 +22,7 @@
 | forwarder.timeout        | string   |         | No       | Timeout for requests to ban url. Duration string                                                                 |
 | validators               | []object |         | Yes      | List of validator configs. See **Validators**                                                                    |
 | dry_run                  | bool     | false   | No       | Run firewall-analyzer in dry run mode                                                                            |
+| analyzer_prefix          | string   |         | Yes      | Prefix that will be added to analyzer id header                                                                  |
 
 # Validators
 

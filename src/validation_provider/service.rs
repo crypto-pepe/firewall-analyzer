@@ -9,11 +9,12 @@ use crate::validation_provider::Validator;
 
 pub struct Service {
     pub validators: Vec<Box<dyn Validator + Sync + Send>>,
+    pub analyzer_prefix: String,
 }
 
 impl Service {
-    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>) -> Self {
-        Self { validators: vv }
+    pub fn from_validators(vv: Vec<Box<dyn Validator + Sync + Send>>, analyzer_prefix: String) -> Self {
+        Self { validators: vv, analyzer_prefix }
     }
 
     pub async fn run(
@@ -37,7 +38,8 @@ impl Service {
                 let res = v.validate(r.clone());
                 match res {
                     Ok(obr) => match obr {
-                        Some(s) => {
+                        Some(mut s) => {
+                            s.analyzer = format!("{}:{}", self.analyzer_prefix, v.name());
                             tracing::info!("ban: {:?}", s);
                             Some(send.send(s))
                         }

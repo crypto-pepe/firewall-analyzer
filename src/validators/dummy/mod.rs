@@ -48,6 +48,6 @@ impl Validator for Dummy {
     }
 
     fn name(&self) -> String {
-        format!("Dummy {}", self.idx)
+        format!("dummy-{}", self.idx)
     }
 }
