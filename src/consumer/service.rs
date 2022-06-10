@@ -1,3 +1,6 @@
+use crate::consumer::RequestConsumer;
+use crate::model::Request;
+use anyhow::Result;
 use async_trait::async_trait;
 use futures::{stream, TryStreamExt};
 use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
@@ -5,9 +8,6 @@ use kafka::Error;
 use pepe_config::kafka::consumer::Config;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-
-use crate::consumer::RequestConsumer;
-use crate::model::Request;
 
 pub struct KafkaRequestConsumer {
     consumer: Consumer,
@@ -37,7 +37,7 @@ impl KafkaRequestConsumer {
 
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) -> anyhow::Result<()> {
+    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<()> {
         loop {
             let consumer = Arc::new(Mutex::new(&mut self.consumer));
             let consumer = consumer.clone();
@@ -49,7 +49,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                 }
             };
 
-            let stream = stream::iter(mss.iter().map::<anyhow::Result<MessageSet>, _>(Ok));
+            let stream = stream::iter(mss.iter().map::<Result<MessageSet>, _>(Ok));
 
             stream
                 .try_for_each(|ms| async {

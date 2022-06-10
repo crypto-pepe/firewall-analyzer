@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::HashMap;
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use chrono::prelude::*;
 
 use super::state::State;
@@ -19,7 +19,7 @@ pub struct RequestsFromIPCounter {
 }
 
 impl RequestsFromIPCounter {
-    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+    pub fn new(cfg: Config) -> Result<Self> {
         Ok(Self {
             rules: cfg
                 .limits
@@ -66,7 +66,7 @@ impl Validator for RequestsFromIPCounter {
                 return Ok(None);
             }
 
-            state.resets_at = Utc::now() + rule.reset_duration;
+            state.resets_at = now + rule.reset_duration;
             state.recent_requests.clear();
             state.requests_since_last_ban = 0;
             state.applied_rule_idx = Some(0);
@@ -80,8 +80,6 @@ impl Validator for RequestsFromIPCounter {
             );
             return Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)));
         }
-
-        // was banned
 
         if state.should_reset_timeout() {
             state.reset(now);

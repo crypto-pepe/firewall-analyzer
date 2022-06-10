@@ -5,9 +5,10 @@ use crate::model::Request;
 use crate::validators::Dummy;
 use crate::validators::{dummy, requests_from_ip_counter, RequestsFromIPCounter};
 pub mod service;
+use anyhow::Result;
 
 pub trait Validator {
-    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>>;
+    fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>>;
     fn name(&self) -> String;
 }
 
@@ -19,7 +20,7 @@ pub enum Config {
     RequestsFromIPCounter(requests_from_ip_counter::Config),
 }
 
-pub fn get_validator(cfg: Config) -> anyhow::Result<Box<dyn Validator + Sync + Send>> {
+pub fn get_validator(cfg: Config) -> Result<Box<dyn Validator + Sync + Send>> {
     Ok(match cfg {
         Config::Dummy(cfg) => Box::new(Dummy::new(cfg)?),
         Config::RequestsFromIPCounter(cfg) => Box::new(RequestsFromIPCounter::new(cfg)?),

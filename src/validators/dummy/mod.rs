@@ -1,6 +1,7 @@
 use crate::model;
 use crate::model::{BanTarget, Request};
 use crate::validation_provider::Validator;
+use anyhow::Result;
 use pepe_config::DurationString;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -19,7 +20,7 @@ pub struct Config {
 }
 
 impl Dummy {
-    pub fn new(cfg: Config) -> anyhow::Result<Self> {
+    pub fn new(cfg: Config) -> Result<Self> {
         Ok(Self {
             idx: cfg.idx,
             ban_duration: {
@@ -32,7 +33,7 @@ impl Dummy {
 }
 impl Validator for Dummy {
     #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>> {
+    fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>> {
         if self.idx % 2 == 1 {
             return Ok(Some(model::BanRequest {
                 target: BanTarget {

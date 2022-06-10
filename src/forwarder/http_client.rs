@@ -27,7 +27,7 @@ impl ExecutorHttpClient {
         let cli = cli
             .build()
             .map_err(|e| ForwarderError::BuildForwarder(e.to_string()))?;
-        Ok(ExecutorHttpClient {
+        Ok(Self {
             url: cfg.ban_target_url.clone(),
             client: cli,
         })
