@@ -13,18 +13,18 @@ pub struct Request {
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq)]
-pub struct ValidatorBanRequest {
+pub struct BanRequest {
     pub target: BanTarget,
     pub reason: String,
     pub ttl: u32,
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq)]
-pub struct BanRequest {
+pub struct ValidatorBanRequest {
     #[serde(flatten)]
-    pub validator_ban_request: ValidatorBanRequest,
+    pub ban_request: BanRequest,
     #[serde(skip_serializing)]
-    pub analyzer: String,
+    pub validator_name: String,
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq)]

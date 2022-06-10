@@ -37,12 +37,12 @@ impl ExecutorHttpClient {
 #[async_trait]
 impl ExecutorClient for ExecutorHttpClient {
     #[tracing::instrument(skip(self))]
-    async fn ban(&self, br: BanRequest) -> Result<(), ForwarderError> {
+    async fn ban(&self, br: BanRequest, analyzer_id: String) -> Result<(), ForwarderError> {
         let res = self
             .client
             .post(self.url.clone())
             .json(&br)
-            .header(ANALYZER_HEADER, br.analyzer.as_str())
+            .header(ANALYZER_HEADER, analyzer_id.as_str())
             .send()
             .await
             .map_err(|e| ForwarderError::SendRequest(e.to_string()))?;

@@ -7,6 +7,7 @@ kafka:
   client_id: 'some-client'
 forwarder:
   url: "http://localhost:8001/api/bans"
+analyzer_name: "analyzer-1"
 validators:
   - requests_from_ip_counter:
       ban_description: "too many requests"
@@ -20,6 +21,5 @@ validators:
         - limit: 1
           ban_duration: 60s
           reset_duration: 120s
-analyzer_prefix: "analyzer-1"
 telemetry:
   svc_name: "firewall-analyzer"

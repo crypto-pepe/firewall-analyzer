@@ -36,11 +36,10 @@ async fn main() -> io::Result<()> {
         .map(validation_provider::get_validator)
         .collect::<Result<Vec<_>, _>>()
         .expect("setup validators");
-    let mut validator_svc =
-        validation_provider::service::Service::from_validators(validators, cfg.analyzer_prefix);
+    let mut validator_svc = validation_provider::service::Service::from_validators(validators);
 
     let (s, r) = mpsc::channel(5);
-    let (fs, fr) = mpsc::channel::<model::BanRequest>(5);
+    let (fs, fr) = mpsc::channel::<model::ValidatorBanRequest>(5);
 
     let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 
@@ -50,7 +49,8 @@ async fn main() -> io::Result<()> {
         Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
     };
 
-    let forwarder_svc = forwarder::service::Service::new(executor_client);
+    let forwarder_svc =
+        forwarder::service::Service::new(executor_client, cfg.analyzer_name.clone());
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 

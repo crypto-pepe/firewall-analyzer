@@ -16,5 +16,5 @@ pub const ANALYZER_HEADER: &str = "X-Analyzer-Id";
 
 #[async_trait]
 pub trait ExecutorClient {
-    async fn ban(&self, br: BanRequest) -> Result<(), ForwarderError>;
+    async fn ban(&self, br: BanRequest, analyzer_name: String) -> Result<(), ForwarderError>;
 }

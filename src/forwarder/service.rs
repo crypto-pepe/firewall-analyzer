@@ -1,23 +1,35 @@
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
 
-use crate::model::BanRequest;
+use crate::model::ValidatorBanRequest;
 use crate::ExecutorClient;
 
 pub struct Service {
     client: Box<dyn ExecutorClient + Send + Sync>,
+    analyzer_name: String,
 }
 
 impl Service {
-    pub fn new(c: Box<dyn ExecutorClient + Send + Sync>) -> Self {
-        Self { client: c }
+    pub fn new(client: Box<dyn ExecutorClient + Send + Sync>, analyzer_name: String) -> Self {
+        Self {
+            client,
+            analyzer_name,
+        }
     }
 
-    pub async fn run(&self, mut recv: Receiver<BanRequest>) {
+    pub async fn run(&self, mut recv: Receiver<ValidatorBanRequest>) {
         loop {
             match recv.try_recv() {
-                Ok(s) => {
-                    if let Err(e) = self.client.ban(s).await {
+                Ok(validator_ban_request) => {
+                    let analyzer_id = format!(
+                        "{}:{}",
+                        self.analyzer_name, validator_ban_request.validator_name
+                    );
+                    if let Err(e) = self
+                        .client
+                        .ban(validator_ban_request.ban_request, analyzer_id)
+                        .await
+                    {
                         tracing::error!("{:?}", e)
                     }
                 }

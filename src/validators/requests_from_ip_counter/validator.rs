@@ -6,7 +6,7 @@ use chrono::prelude::*;
 
 use super::state::State;
 
-use crate::model::{BanTarget, Request, ValidatorBanRequest};
+use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
 use crate::validators::requests_from_ip_counter::error::RulesError;
 use crate::validators::requests_from_ip_counter::BanRule;
@@ -32,8 +32,8 @@ impl RequestsFromIPCounter {
     }
 
     #[tracing::instrument(skip(self))]
-    fn ban(&self, ttl: u32, ip: String) -> ValidatorBanRequest {
-        ValidatorBanRequest {
+    fn ban(&self, ttl: u32, ip: String) -> BanRequest {
+        BanRequest {
             target: BanTarget {
                 ip: Some(ip),
                 user_agent: None,
@@ -46,7 +46,7 @@ impl RequestsFromIPCounter {
 
 impl Validator for RequestsFromIPCounter {
     #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> Result<Option<ValidatorBanRequest>, Error> {
+    fn validate(&mut self, req: Request) -> Result<Option<BanRequest>, Error> {
         let ip = req.remote_ip;
         let rule = self.rules.get(0).ok_or(RulesError::NotFound(0))?;
         let mut state = self
@@ -135,7 +135,7 @@ mod tests {
     use anyhow::Error;
     use chrono::Duration;
 
-    use crate::model::{BanTarget, Request, ValidatorBanRequest};
+    use crate::model::{BanRequest, BanTarget, Request};
     use crate::validation_provider::Validator;
     use crate::validators::requests_from_ip_counter::BanRule;
     use crate::validators::RequestsFromIPCounter;
@@ -175,8 +175,8 @@ mod tests {
     pub struct TestCase {
         //request, sleep before request
         pub input: Vec<(Request, Duration)>,
-        pub want_last: Option<Result<Option<ValidatorBanRequest>, Error>>,
-        pub want_every: Option<Vec<Option<ValidatorBanRequest>>>,
+        pub want_last: Option<Result<Option<BanRequest>, Error>>,
+        pub want_every: Option<Vec<Option<BanRequest>>>,
     }
 
     fn req_with_ip(ip: &str) -> Request {
@@ -198,7 +198,7 @@ mod tests {
                 (req_with_ip("1.1.1.1"), Duration::seconds(0)),
                 (req_with_ip("1.1.1.1"), Duration::seconds(0)),
             ],
-            want_last: Some(Ok(Some(ValidatorBanRequest {
+            want_last: Some(Ok(Some(BanRequest {
                 target: BanTarget {
                     ip: Some("1.1.1.1".to_string()),
                     user_agent: None,
@@ -268,7 +268,7 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -297,7 +297,7 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -306,7 +306,7 @@ mod tests {
                     ttl: 1,
                 }),
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -338,7 +338,7 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("3.3.3.3".to_string()),
                         user_agent: None,
@@ -347,7 +347,7 @@ mod tests {
                     ttl: 1,
                 }),
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -376,7 +376,7 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -386,7 +386,7 @@ mod tests {
                 }),
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -416,7 +416,7 @@ mod tests {
             want_every: Some(vec![
                 None,
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -425,7 +425,7 @@ mod tests {
                     ttl: 1,
                 }),
                 None,
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -433,7 +433,7 @@ mod tests {
                     reason: "".to_string(),
                     ttl: 3,
                 }),
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,
@@ -441,7 +441,7 @@ mod tests {
                     reason: "".to_string(),
                     ttl: 4,
                 }),
-                Some(ValidatorBanRequest {
+                Some(BanRequest {
                     target: BanTarget {
                         ip: Some("1.1.1.1".to_string()),
                         user_agent: None,

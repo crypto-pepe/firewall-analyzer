@@ -32,9 +32,9 @@ impl Dummy {
 }
 impl Validator for Dummy {
     #[tracing::instrument(skip(self))]
-    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::ValidatorBanRequest>> {
+    fn validate(&mut self, req: Request) -> anyhow::Result<Option<model::BanRequest>> {
         if self.idx % 2 == 1 {
-            return Ok(Some(model::ValidatorBanRequest {
+            return Ok(Some(model::BanRequest {
                 target: BanTarget {
                     ip: Some(req.remote_ip),
                     user_agent: None,

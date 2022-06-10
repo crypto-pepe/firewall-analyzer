@@ -4,30 +4,23 @@ use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::error::ProcessingError;
 use crate::model;
-use crate::model::BanRequest;
+use crate::model::ValidatorBanRequest;
 use crate::validation_provider::Validator;
 
 pub struct Service {
     pub validators: Vec<Box<dyn Validator + Sync + Send>>,
-    pub analyzer_prefix: String,
 }
 
 impl Service {
-    pub fn from_validators(
-        validators: Vec<Box<dyn Validator + Sync + Send>>,
-        analyzer_prefix: String,
-    ) -> Self {
-        Self {
-            validators,
-            analyzer_prefix,
-        }
+    pub fn from_validators(validators: Vec<Box<dyn Validator + Sync + Send>>) -> Self {
+        Self { validators }
     }
 
     pub async fn run(
         &mut self,
         mut recv: Receiver<model::Request>,
-        send: Sender<BanRequest>,
-    ) -> Result<(), ProcessingError<BanRequest>> {
+        send: Sender<ValidatorBanRequest>,
+    ) -> Result<(), ProcessingError<ValidatorBanRequest>> {
         loop {
             let r = match recv.try_recv() {
                 Ok(r) => r,
@@ -45,9 +38,9 @@ impl Service {
                 match res {
                     Ok(obr) => match obr {
                         Some(validator_ban_request) => {
-                            let ban_request = BanRequest {
-                                validator_ban_request,
-                                analyzer: format!("{}:{}", self.analyzer_prefix, v.name()),
+                            let ban_request = ValidatorBanRequest {
+                                ban_request: validator_ban_request,
+                                validator_name: v.name(),
                             };
                             tracing::info!("ban: {:?}", ban_request);
                             Some(send.send(ban_request))
