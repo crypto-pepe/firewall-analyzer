@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Request {
     pub remote_ip: String,
     pub host: String,
@@ -12,18 +12,16 @@ pub struct Request {
     pub body: String,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq)]
+#[derive(Debug, Serialize)]
 pub struct BanRequest {
     pub target: BanTarget,
     pub reason: String,
     pub ttl: u32,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct ValidatorBanRequest {
-    #[serde(flatten)]
     pub ban_request: BanRequest,
-    #[serde(skip_serializing)]
     pub validator_name: String,
 }
 
