@@ -12,7 +12,7 @@ pub struct Request {
     pub body: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Eq, PartialEq)]
 pub struct BanRequest {
     pub target: BanTarget,
     pub reason: String,
