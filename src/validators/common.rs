@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -25,4 +26,10 @@ impl TryFrom<BanRuleConfig> for BanRule {
             reset_duration: chrono::Duration::from_std(brc.reset_duration.into())?,
         })
     }
+}
+
+#[derive(Error, Debug)]
+pub enum RulesError {
+    #[error("rule {0} not found")]
+    NotFound(usize),
 }

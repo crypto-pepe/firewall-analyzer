@@ -8,8 +8,7 @@ use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
-use crate::validators::requests_from_ip_counter::error::RulesError;
-use crate::validators::requests_from_ip_counter::BanRule;
+use crate::validators::common::{BanRule, RulesError};
 use crate::validators::requests_from_ip_counter::Config;
 
 pub struct RequestsFromIPCounter {
@@ -135,7 +134,7 @@ mod tests {
 
     use crate::model::{BanRequest, BanTarget, Request};
     use crate::validation_provider::Validator;
-    use crate::validators::requests_from_ip_counter::BanRule;
+    use crate::validators::common::BanRule;
     use crate::validators::RequestsFromIPCounter;
 
     /// `get_default_validator` returns `IPCount` with
