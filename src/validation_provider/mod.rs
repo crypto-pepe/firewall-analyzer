@@ -19,6 +19,7 @@ pub enum Config {
     Dummy(dummy::Config),
     #[serde(rename = "requests_from_ip_counter")]
     RequestsFromIPCounter(requests_from_ip_counter::Config),
+    #[serde(rename = "requests_from_ip_cost")]
     RequestsFromIPCost(requests_from_ip_cost::Config),
 }
 
