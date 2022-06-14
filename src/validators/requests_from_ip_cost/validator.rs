@@ -103,6 +103,7 @@ impl Validator for RequestsFromIPCost {
         // Whether target is not banned
         if state.applied_rule_idx.is_none() {
             state.recent_requests.push((cost, now));
+            state.clean_before(now - rule.reset_duration);
 
             if !state.is_overflow(now - rule.reset_duration) {
                 return Ok(None);

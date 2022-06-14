@@ -37,4 +37,8 @@ impl State {
             .fold(0u64, |c, (cost, _)| c + cost)
             >= self.cost_limit
     }
+
+    pub fn clean_before(&mut self, before: DateTime<Utc>) {
+        self.recent_requests.retain(|(_, t)| *t >= before)
+    }
 }
