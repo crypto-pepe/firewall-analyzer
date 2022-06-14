@@ -58,6 +58,23 @@ Example:
 | limits.ban_duration   | string |         | Yes      | TTL for banned target. Duration string      |
 | limits.reset_duration | string |         | Yes      | Duration for resetting ban. Duration string |
 
+### requests_from_ip_cost
+Bans ip if total requests cost reaches limit. Cost of first matching pattern is chosen. If there is no matching patterns 
+then default cost is used. 
+#### Config
+
+| Name                  | Type   | Default | Required | Note                                                        |
+|-----------------------|--------|---------|----------|-------------------------------------------------------------|
+| ban_description       | string |         | Yes      | Reason sending to executor                                  |
+| limits.limit          | int    |         | Yes      | Total cost of requests allowed on current limit             |
+| limits.ban_duration   | string |         | Yes      | TTL for banned target. Duration string                      |
+| limits.reset_duration | string |         | Yes      | Duration for resetting ban. Duration string                 |
+| default_cost          | int    |         | Yes      | Default cost of request is used if none of patterns matched |
+| patterns.method       | string |         | Yes      | Method of request                                           |
+| patterns.path_regex   | string |         | Yes      | Regexp for request's path                                   |
+| patterns.body_regex   | string |         | Yes      | Regexp for request's body                                   |
+| patterns.cost         | int    |         | Yes      | Cost of matching requests                                   |
+
 ## Writing your own validator
 
 Inside of `src/validators/` create module with your validator and implement `Validator` trait from `src/validation_provider/mod.rs`.
