@@ -1,6 +1,5 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
 
-
 #[derive(Debug)]
 pub(crate) struct State {
     pub cost_limit: u64,

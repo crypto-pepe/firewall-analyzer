@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-use crate::model;
-use crate::model::Request;
-use crate::validators::requests_from_ip_cost;
-use crate::validators::{Dummy, RequestsFromIPCost};
-use crate::validators::{dummy, requests_from_ip_counter, RequestsFromIPCounter};
-pub mod service;
+use crate::model::{BanRequest, Request};
+use crate::validators::{
+    dummy, requests_from_ip_cost, requests_from_ip_counter, Dummy, RequestsFromIPCost,
+    RequestsFromIPCounter,
+};
 use anyhow::Result;
 
+pub mod service;
+
 pub trait Validator {
-    fn validate(&mut self, req: Request) -> Result<Option<model::BanRequest>>;
+    fn validate(&mut self, req: Request) -> Result<Option<BanRequest>>;
     fn name(&self) -> String;
 }
 
