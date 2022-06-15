@@ -7,6 +7,7 @@ pub use service::Service;
 
 use crate::model::BanRequest;
 
+pub mod config;
 pub mod error;
 pub mod http_client;
 pub mod noop_client;
