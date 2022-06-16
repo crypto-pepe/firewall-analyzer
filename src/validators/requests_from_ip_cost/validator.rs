@@ -77,7 +77,7 @@ impl RequestsFromIPCost {
         }
     }
 
-    fn calculate_cost(default_cost: u64, patterns: &[Pattern], req: &Request) -> u64 {
+    fn evaluate_request(default_cost: u64, patterns: &[Pattern], req: &Request) -> u64 {
         // first found is used
         patterns
             .iter()
@@ -107,13 +107,13 @@ impl Validator for RequestsFromIPCost {
         let now = Utc::now();
 
         let cost =
-            RequestsFromIPCost::calculate_cost(self.default_cost, self.patterns.as_ref(), &req);
+            RequestsFromIPCost::evaluate_request(self.default_cost, self.patterns.as_ref(), &req);
         // Whether target is not banned
         if state.applied_rule_idx.is_none() {
             state.recent_requests.push((cost, now));
             state.clean_before(now - rule.reset_duration);
 
-            if !state.is_overflow(now - rule.reset_duration) {
+            if !state.is_limit_reached(now - rule.reset_duration) {
                 return Ok(None);
             }
             state.resets_at = now + rule.reset_duration;
@@ -143,7 +143,14 @@ impl Validator for RequestsFromIPCost {
             .applied_rule_idx
             .map_or(0, |v| min(v + 1, self.rules.len() - 1));
 
-        if apply_rule_if_possible(state, &self.rules, rule_idx, now)? {
+        let rule = self
+            .rules
+            .get(rule_idx)
+            .ok_or(RulesError::NotFound(rule_idx))?;
+        if state.cost_since_last_ban >= rule.limit {
+            state.resets_at = now + rule.reset_duration;
+            state.cost_since_last_ban = 0;
+            state.applied_rule_idx = Some(rule_idx + 1);
             let rule = self.rules[rule_idx];
             tracing::info!(
                 action = "ban",
@@ -160,22 +167,6 @@ impl Validator for RequestsFromIPCost {
     fn name(&self) -> String {
         "requests-from-ip-cost".into()
     }
-}
-
-fn apply_rule_if_possible(
-    state: &mut State,
-    rules: &[BanRule],
-    rule_idx: usize,
-    last_request_time: DateTime<Utc>,
-) -> Result<bool, RulesError> {
-    let rule = rules.get(rule_idx).ok_or(RulesError::NotFound(rule_idx))?;
-    if state.cost_since_last_ban >= rule.limit {
-        state.resets_at = last_request_time + rule.reset_duration;
-        state.cost_since_last_ban = 0;
-        state.applied_rule_idx = Some(rule_idx + 1);
-        return Ok(true);
-    }
-    Ok(false)
 }
 
 #[cfg(test)]

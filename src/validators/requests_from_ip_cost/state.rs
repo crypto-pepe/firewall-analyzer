@@ -29,7 +29,7 @@ impl State {
         self.applied_rule_idx = None;
     }
 
-    pub fn is_overflow(&self, for_time: DateTime<Utc>) -> bool {
+    pub fn is_limit_reached(&self, for_time: DateTime<Utc>) -> bool {
         self.recent_requests
             .iter()
             .filter(|(_cost, t)| *t > for_time)
