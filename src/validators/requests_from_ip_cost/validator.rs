@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use anyhow::{Error, Result};
 use chrono::prelude::*;
+use regex::Regex;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
@@ -21,9 +22,9 @@ pub struct RequestsFromIPCost {
 }
 
 pub struct Pattern {
-    pub method: String,
-    pub path_pattern: regex::Regex,
-    pub body_pattern: regex::Regex,
+    pub method: Option<String>,
+    pub path_pattern: Regex,
+    pub body_pattern: Option<Regex>,
     pub cost: u64,
 }
 
@@ -31,10 +32,15 @@ impl TryFrom<RequestPatternConfig> for Pattern {
     type Error = Error;
 
     fn try_from(cfg: RequestPatternConfig) -> std::result::Result<Self, Self::Error> {
+        let body_pattern = match cfg.body_regex {
+            None => None,
+            Some(r) => Some(Regex::new(r.as_str())?),
+        };
+
         Ok(Self {
             method: cfg.method,
-            path_pattern: regex::Regex::new(cfg.path_regex.as_str())?,
-            body_pattern: regex::Regex::new(cfg.body_regex.as_str())?,
+            path_pattern: Regex::new(cfg.path_regex.as_str())?,
+            body_pattern,
             cost: cfg.cost,
         })
     }
@@ -75,13 +81,15 @@ impl RequestsFromIPCost {
         // first found is used
         patterns
             .iter()
-            .filter(|p| {
-                p.method == req.method
-                    && p.body_pattern.is_match(req.body.as_str())
+            .find_map(|p| {
+                (p.method.clone().map(|a| a == req.method).unwrap_or(true)
                     && p.path_pattern.is_match(req.path.as_str())
+                    && p.body_pattern
+                        .clone()
+                        .map(|p| p.is_match(req.body.as_str()))
+                        .unwrap_or(true))
+                .then(|| p.cost)
             })
-            .map(|p| p.cost)
-            .next()
             .unwrap_or(default_cost)
     }
 }
@@ -172,13 +180,14 @@ fn apply_rule_if_possible(
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Error;
+    use chrono::Duration;
+
     use crate::model::{BanRequest, BanTarget, Request};
     use crate::validation_provider::Validator;
     use crate::validators::common::BanRule;
     use crate::validators::requests_from_ip_cost::validator::Pattern;
     use crate::validators::requests_from_ip_cost::RequestsFromIPCost;
-    use anyhow::Error;
-    use chrono::Duration;
 
     /// `get_default_validator` returns `RequestsFromIPCost` with
     /// next limits:
@@ -210,45 +219,45 @@ mod tests {
             ],
             patterns: vec![
                 Pattern {
-                    method: "GET".to_string(),
+                    method: Some("GET".to_string()),
                     path_pattern: regex::Regex::new(r"/cost/1.*").unwrap(),
-                    body_pattern: regex::Regex::new(r".*").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r".*").unwrap()),
                     cost: 1,
                 },
                 Pattern {
-                    method: "GET".to_string(),
+                    method: Some("GET".to_string()),
                     path_pattern: regex::Regex::new(r"/cost/2.*").unwrap(),
-                    body_pattern: regex::Regex::new(r".*").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r".*").unwrap()),
                     cost: 2,
                 },
                 Pattern {
-                    method: "POST".to_string(),
+                    method: Some("POST".to_string()),
                     path_pattern: regex::Regex::new(r"/cost/1.*").unwrap(),
-                    body_pattern: regex::Regex::new(r".*").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r".*").unwrap()),
                     cost: 10,
                 },
                 Pattern {
-                    method: "POST".to_string(),
+                    method: Some("POST".to_string()),
                     path_pattern: regex::Regex::new(r"/cost/2.*").unwrap(),
-                    body_pattern: regex::Regex::new(r".*").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r".*").unwrap()),
                     cost: 20,
                 },
                 Pattern {
-                    method: "POST".to_string(),
+                    method: Some("POST".to_string()),
                     path_pattern: regex::Regex::new(r"/123").unwrap(),
-                    body_pattern: regex::Regex::new(r"some payload").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r"some payload").unwrap()),
                     cost: 15,
                 },
                 Pattern {
-                    method: "POST".to_string(),
+                    method: Some("POST".to_string()),
                     path_pattern: regex::Regex::new(r"/123").unwrap(),
-                    body_pattern: regex::Regex::new(r"big payload").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r"big payload").unwrap()),
                     cost: 29,
                 },
                 Pattern {
-                    method: "POST".to_string(),
+                    method: Some("POST".to_string()),
                     path_pattern: regex::Regex::new(r".*").unwrap(),
-                    body_pattern: regex::Regex::new(r".*").unwrap(),
+                    body_pattern: Some(regex::Regex::new(r".*").unwrap()),
                     cost: 5,
                 },
             ],
@@ -267,6 +276,7 @@ mod tests {
             body: body.to_string(),
         }
     }
+
     pub struct TestCase {
         //request, sleep before request
         pub input: Vec<(Request, Duration)>,

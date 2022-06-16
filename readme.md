@@ -70,9 +70,9 @@ then default cost is used.
 | limits.ban_duration   | string |         | Yes      | TTL for banned target. Duration string                      |
 | limits.reset_duration | string |         | Yes      | Duration for resetting ban. Duration string                 |
 | default_cost          | int    |         | Yes      | Default cost of request is used if none of patterns matched |
-| patterns.method       | string |         | Yes      | Method of request                                           |
+| patterns.method       | string |         | No       | Method of request. If not stated, any method matches        |
 | patterns.path_regex   | string |         | Yes      | Regexp for request's path                                   |
-| patterns.body_regex   | string |         | Yes      | Regexp for request's body                                   |
+| patterns.body_regex   | string |         | No       | Regexp for request's body. If not stated, any body matches  |
 | patterns.cost         | int    |         | Yes      | Cost of matching requests                                   |
 
 ## Writing your own validator

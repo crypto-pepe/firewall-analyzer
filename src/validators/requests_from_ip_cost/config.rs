@@ -12,8 +12,8 @@ pub struct Config {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RequestPatternConfig {
-    pub method: String,
+    pub method: Option<String>,
     pub path_regex: String,
-    pub body_regex: String,
+    pub body_regex: Option<String>,
     pub cost: u64,
 }
