@@ -47,12 +47,13 @@ async fn main() -> io::Result<()> {
         Box::new(forwarder::NoopClient {})
     } else {
         Box::new(
-            forwarder::ExecutorHttpClient::new(&cfg.forwarder_http_client)
+            forwarder::ExecutorHttpClient::new(&cfg.forwarder.http_config)
                 .expect("create forwarder"),
         )
     };
 
-    let forwarder_svc = forwarder::service::Service::new(executor_client, cfg.forwarder_service);
+    let forwarder_svc =
+        forwarder::service::Service::new(executor_client, cfg.forwarder, cfg.analyzer_name);
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 

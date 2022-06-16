@@ -1,9 +1,8 @@
-use std::iter::Take;
 use std::thread::sleep;
+use std::time::Duration;
 
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
-use tokio_retry::strategy::FixedInterval;
 
 use crate::forwarder::config::Config;
 use crate::model::ValidatorBanRequest;
@@ -11,16 +10,22 @@ use crate::ExecutorClient;
 
 pub struct Service {
     client: Box<dyn ExecutorClient + Send + Sync>,
-    retry_strategy: Take<FixedInterval>,
+    retry_count: usize,
+    retry_wait: Duration,
     analyzer_name: String,
 }
 
 impl Service {
-    pub fn new(client: Box<dyn ExecutorClient + Send + Sync>, cfg: Config) -> Self {
+    pub fn new(
+        client: Box<dyn ExecutorClient + Send + Sync>,
+        cfg: Config,
+        analyzer_name: String,
+    ) -> Self {
         Self {
-            analyzer_name: cfg.analyzer_name,
+            analyzer_name,
             client,
-            retry_strategy: FixedInterval::new(cfg.retry_wait.into()).take(cfg.retry_count),
+            retry_count: cfg.retry_count,
+            retry_wait: cfg.retry_wait.into(),
         }
     }
 
@@ -41,8 +46,8 @@ impl Service {
                         )
                         .await;
                     if ban_result.is_err() {
-                        for wait in self.retry_strategy.clone() {
-                            sleep(wait);
+                        for _ in 1..self.retry_count {
+                            sleep(self.retry_wait);
                             ban_result = self
                                 .client
                                 .ban(

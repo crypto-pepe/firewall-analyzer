@@ -5,12 +5,11 @@ kafka:
     - 'some-topic'
   group: 'some-group'
   client_id: 'some-client'
-forwarder_http_client:
+forwarder:
   ban_target_url: "http://localhost:8001/api/bans"
-forwarder_service:
   retry_count: 3
   retry_wait: 3s
-  analyzer_name: "analyzer-1"
+analyzer_name: "analyzer-1"
 validators:
   - requests_from_ip_counter:
       ban_description: "too many requests"
