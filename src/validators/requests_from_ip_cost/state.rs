@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
 pub struct AppliedRule {
-    pub applied_rule_idx: usize,
+    pub rule_idx: usize,
     pub resets_at: DateTime<Utc>,
 }
 

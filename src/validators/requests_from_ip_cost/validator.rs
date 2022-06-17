@@ -126,7 +126,7 @@ impl Validator for RequestsFromIPCost {
                     return Ok(None);
                 }
                 state.applied_rule = Some(AppliedRule {
-                    applied_rule_idx: 0,
+                    rule_idx: 0,
                     resets_at: now + first_rule.reset_duration,
                 });
 
@@ -143,8 +143,7 @@ impl Validator for RequestsFromIPCost {
             Some(applied_rule) => {
                 state.cost_since_last_ban += cost;
 
-                let applying_rule_idx =
-                    min(applied_rule.applied_rule_idx + 1, self.rules.len() - 1);
+                let applying_rule_idx = min(applied_rule.rule_idx + 1, self.rules.len() - 1);
 
                 let applying_rule = self
                     .rules
@@ -152,7 +151,7 @@ impl Validator for RequestsFromIPCost {
                     .ok_or(RulesError::NotFound(applying_rule_idx))?;
                 if state.cost_since_last_ban >= applying_rule.limit {
                     state.applied_rule = Some(AppliedRule {
-                        applied_rule_idx: applying_rule_idx,
+                        rule_idx: applying_rule_idx,
                         resets_at: now + applying_rule.reset_duration,
                     });
                     state.cost_since_last_ban = 0;
