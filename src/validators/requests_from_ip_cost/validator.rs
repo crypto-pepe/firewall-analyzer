@@ -109,28 +109,6 @@ impl Validator for RequestsFromIPCost {
         let cost =
             RequestsFromIPCost::evaluate_request(self.default_cost, self.patterns.as_ref(), &req);
         // Whether target is not banned
-        if state.applied_rule_idx.is_none() {
-            state.recent_requests.push((cost, now));
-            state.clean_before(now - first_rule.reset_duration);
-
-            if !state.is_limit_reached(now - first_rule.reset_duration) {
-                return Ok(None);
-            }
-            state.resets_at = now + first_rule.reset_duration;
-            state.recent_requests.clear();
-            state.cost_since_last_ban = 0;
-            state.applied_rule_idx = Some(0);
-
-            tracing::info!(
-                action = "ban",
-                ip = ip.as_str(),
-                limit = first_rule.limit,
-                ttl = first_rule.ban_duration.num_seconds()
-            );
-            return Ok(Some(
-                self.ban(first_rule.ban_duration.num_seconds() as u32, ip),
-            ));
-        }
 
         if state.should_reset_timeout() {
             state.reset(cost, now);
@@ -138,32 +116,53 @@ impl Validator for RequestsFromIPCost {
             return Ok(None);
         }
 
-        state.cost_since_last_ban += cost;
+        match state.applied_rule_idx {
+            None => {
+                state.recent_requests.push((cost, now));
+                state.clean_before(now - first_rule.reset_duration);
 
-        let rule_idx = state
-            .applied_rule_idx
-            .map_or(0, |v| min(v + 1, self.rules.len() - 1));
+                if !state.is_limit_reached(now - first_rule.reset_duration) {
+                    return Ok(None);
+                }
+                state.resets_at = now + first_rule.reset_duration;
+                state.applied_rule_idx = Some(0);
 
-        let applying_rule = self
-            .rules
-            .get(rule_idx)
-            .ok_or(RulesError::NotFound(rule_idx))?;
-        if state.cost_since_last_ban >= applying_rule.limit {
-            state.resets_at = now + applying_rule.reset_duration;
-            state.cost_since_last_ban = 0;
-            state.applied_rule_idx = Some(rule_idx + 1);
-            tracing::info!(
-                action = "ban",
-                ip = ip.as_str(),
-                limit = applying_rule.limit,
-                ttl = applying_rule.ban_duration.num_seconds()
-            );
-            return Ok(Some(
-                self.ban(applying_rule.ban_duration.num_seconds() as u32, ip),
-            ));
+                tracing::info!(
+                    action = "ban",
+                    ip = ip.as_str(),
+                    limit = first_rule.limit,
+                    ttl = first_rule.ban_duration.num_seconds()
+                );
+                Ok(Some(
+                    self.ban(first_rule.ban_duration.num_seconds() as u32, ip),
+                ))
+            }
+            Some(idx) => {
+                state.cost_since_last_ban += cost;
+
+                let rule_idx = min(idx + 1, self.rules.len() - 1);
+
+                let applying_rule = self
+                    .rules
+                    .get(rule_idx)
+                    .ok_or(RulesError::NotFound(rule_idx))?;
+                if state.cost_since_last_ban >= applying_rule.limit {
+                    state.resets_at = now + applying_rule.reset_duration;
+                    state.cost_since_last_ban = 0;
+                    state.applied_rule_idx = Some(rule_idx + 1);
+                    tracing::info!(
+                        action = "ban",
+                        ip = ip.as_str(),
+                        limit = applying_rule.limit,
+                        ttl = applying_rule.ban_duration.num_seconds()
+                    );
+                    return Ok(Some(
+                        self.ban(applying_rule.ban_duration.num_seconds() as u32, ip),
+                    ));
+                }
+                Ok(None)
+            }
         }
-
-        Ok(None)
     }
 
     fn name(&self) -> String {
