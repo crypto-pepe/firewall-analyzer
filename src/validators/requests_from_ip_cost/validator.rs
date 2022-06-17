@@ -143,7 +143,8 @@ impl Validator for RequestsFromIPCost {
             Some(applied_rule) => {
                 state.cost_since_last_ban += cost;
 
-                let applying_rule_idx = min(applied_rule.applied_rule_idx + 1, self.rules.len() - 1);
+                let applying_rule_idx =
+                    min(applied_rule.applied_rule_idx + 1, self.rules.len() - 1);
 
                 let applying_rule = self
                     .rules
