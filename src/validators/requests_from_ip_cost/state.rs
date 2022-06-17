@@ -1,12 +1,17 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
+
+#[derive(Debug, Clone)]
+pub struct AppliedRule {
+    pub applied_rule_idx: usize,
+    pub resets_at: DateTime<Utc>,
+}
 
 #[derive(Debug)]
 pub(crate) struct State {
     pub cost_limit: u64,
+    pub applied_rule: Option<AppliedRule>,
     pub cost_since_last_ban: u64,
-    pub applied_rule_idx: Option<usize>,
     pub recent_requests: Vec<(u64, DateTime<Utc>)>,
-    pub resets_at: DateTime<Utc>,
 }
 
 impl State {
@@ -14,19 +19,16 @@ impl State {
         Self {
             cost_limit,
             cost_since_last_ban: 0,
-            applied_rule_idx: None,
+            applied_rule: None,
             recent_requests: vec![],
-            resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
         }
     }
 
-    pub fn should_reset_timeout(&self) -> bool {
-        self.resets_at <= Utc::now() && self.applied_rule_idx.is_some()
-    }
-
-    pub fn reset(&mut self, cost: u64, last_request_time: DateTime<Utc>) {
-        self.recent_requests.push((cost, last_request_time));
-        self.applied_rule_idx = None;
+    pub fn should_reset_timeout(&self, by_time: DateTime<Utc>) -> bool {
+        match self.applied_rule {
+            None => false,
+            Some(AppliedRule { resets_at, .. }) => resets_at <= by_time,
+        }
     }
 
     pub fn is_limit_reached(&self, for_time: DateTime<Utc>) -> bool {

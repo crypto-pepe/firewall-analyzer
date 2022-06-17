@@ -9,6 +9,7 @@ use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
 use crate::validators::common::{BanRule, RulesError};
 use crate::validators::requests_from_ip_cost::config::RequestPatternConfig;
+use crate::validators::requests_from_ip_cost::state::AppliedRule;
 use crate::validators::requests_from_ip_cost::Config;
 
 use super::state::State;
@@ -106,17 +107,17 @@ impl Validator for RequestsFromIPCost {
 
         let now = Utc::now();
 
-        let cost =
-            RequestsFromIPCost::evaluate_request(self.default_cost, self.patterns.as_ref(), &req);
+        let cost = RequestsFromIPCost::evaluate_request(self.default_cost, &self.patterns, &req);
         // Whether target is not banned
 
-        if state.should_reset_timeout() {
-            state.reset(cost, now);
+        if state.should_reset_timeout(now) {
+            state.recent_requests.push((cost, now));
+            state.applied_rule = None;
             tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
         }
 
-        match state.applied_rule_idx {
+        match state.applied_rule.clone() {
             None => {
                 state.recent_requests.push((cost, now));
                 state.clean_before(now - first_rule.reset_duration);
@@ -124,8 +125,10 @@ impl Validator for RequestsFromIPCost {
                 if !state.is_limit_reached(now - first_rule.reset_duration) {
                     return Ok(None);
                 }
-                state.resets_at = now + first_rule.reset_duration;
-                state.applied_rule_idx = Some(0);
+                state.applied_rule = Some(AppliedRule {
+                    applied_rule_idx: 0,
+                    resets_at: now + first_rule.reset_duration,
+                });
 
                 tracing::info!(
                     action = "ban",
@@ -137,19 +140,21 @@ impl Validator for RequestsFromIPCost {
                     self.ban(first_rule.ban_duration.num_seconds() as u32, ip),
                 ))
             }
-            Some(idx) => {
+            Some(applied_rule) => {
                 state.cost_since_last_ban += cost;
 
-                let rule_idx = min(idx + 1, self.rules.len() - 1);
+                let rule_idx = min(applied_rule.applied_rule_idx + 1, self.rules.len() - 1);
 
                 let applying_rule = self
                     .rules
                     .get(rule_idx)
                     .ok_or(RulesError::NotFound(rule_idx))?;
                 if state.cost_since_last_ban >= applying_rule.limit {
-                    state.resets_at = now + applying_rule.reset_duration;
+                    state.applied_rule = Some(AppliedRule {
+                        applied_rule_idx: rule_idx + 1,
+                        resets_at: now + applying_rule.reset_duration,
+                    });
                     state.cost_since_last_ban = 0;
-                    state.applied_rule_idx = Some(rule_idx + 1);
                     tracing::info!(
                         action = "ban",
                         ip = ip.as_str(),
