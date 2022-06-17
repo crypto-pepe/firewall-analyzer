@@ -10,7 +10,7 @@ use crate::ExecutorClient;
 pub struct Service {
     client: Box<dyn ExecutorClient + Send + Sync>,
     retry_strategy: Take<tokio_retry::strategy::FixedInterval>,
-    analyzer_name: String,
+    analyzer_id: String,
 }
 
 impl Service {
@@ -20,7 +20,7 @@ impl Service {
         analyzer_name: String,
     ) -> Self {
         Self {
-            analyzer_name,
+            analyzer_id: analyzer_name,
             client,
             retry_strategy: tokio_retry::strategy::FixedInterval::new(cfg.retry_wait.into())
                 .take(cfg.retry_count),
@@ -33,7 +33,7 @@ impl Service {
                 Ok(validator_ban_request) => {
                     let analyzer_id = format!(
                         "{}:{}",
-                        self.analyzer_name, validator_ban_request.validator_name
+                        self.analyzer_id, validator_ban_request.validator_name
                     );
 
                     if let Err(e) = tokio_retry::Retry::spawn(self.retry_strategy.clone(), || {

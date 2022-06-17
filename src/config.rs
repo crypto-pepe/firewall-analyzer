@@ -6,7 +6,7 @@ use crate::{forwarder, telemetry, validation_provider};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub kafka: pepe_config::kafka::consumer::Config,
-    pub analyzer_name: String,
+    pub analyzer_id: String,
     pub forwarder: forwarder::config::Config,
     pub telemetry: telemetry::Config,
     pub validators: Vec<validation_provider::Config>,

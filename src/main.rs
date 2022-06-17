@@ -53,7 +53,7 @@ async fn main() -> io::Result<()> {
     };
 
     let forwarder_svc =
-        forwarder::service::Service::new(executor_client, cfg.forwarder, cfg.analyzer_name);
+        forwarder::service::Service::new(executor_client, cfg.forwarder, cfg.analyzer_id);
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
