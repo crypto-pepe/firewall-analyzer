@@ -7,5 +7,5 @@ pub struct Config {
     #[serde(flatten)]
     pub http_config: http_client::Config,
     pub retry_count: usize,
-    pub retry_wait: DurationString,
+    pub retry_interval: DurationString,
 }

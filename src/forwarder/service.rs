@@ -8,21 +8,21 @@ use crate::model::ValidatorBanRequest;
 use crate::ExecutorClient;
 
 pub struct Service {
-    client: Box<dyn ExecutorClient + Send + Sync>,
+    executor: Box<dyn ExecutorClient + Send + Sync>,
     retry_strategy: Take<tokio_retry::strategy::FixedInterval>,
     analyzer_id: String,
 }
 
 impl Service {
     pub fn new(
-        client: Box<dyn ExecutorClient + Send + Sync>,
+        executor: Box<dyn ExecutorClient + Send + Sync>,
         cfg: Config,
-        analyzer_name: String,
+        analyzer_id: String,
     ) -> Self {
         Self {
-            analyzer_id: analyzer_name,
-            client,
-            retry_strategy: tokio_retry::strategy::FixedInterval::new(cfg.retry_wait.into())
+            analyzer_id,
+            executor,
+            retry_strategy: tokio_retry::strategy::FixedInterval::new(cfg.retry_interval.into())
                 .take(cfg.retry_count),
         }
     }
@@ -37,7 +37,7 @@ impl Service {
                     );
 
                     if let Err(e) = tokio_retry::Retry::spawn(self.retry_strategy.clone(), || {
-                        self.client.ban(
+                        self.executor.ban(
                             validator_ban_request.ban_request.clone(),
                             analyzer_id.clone(),
                         )

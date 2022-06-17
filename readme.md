@@ -12,19 +12,19 @@
 **If `CONFIG_PATH` is not stated then `./config.yaml` will be used**
 
 
-| Name                     | Type     | Default | Required | Note                                                                                                            |
-|--------------------------|----------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
-| kafka.brokers            | []string |         | Yes      | List of kafka brokers                                                                                           |
-| kafka.topics             | []string |         | Yes      | List of kafka topics with messages to analyze                                                                   |
-| kafka.group              | string   |         | Yes      | Kafka group for this app                                                                                        |
-| kafka.client_id          | string   |         | Yes      | Kafka client id for this app                                                                                    |
+| Name                     | Type     | Default | Required | Note                                                                                                             |
+|--------------------------|----------|---------|----------|------------------------------------------------------------------------------------------------------------------|
+| kafka.brokers            | []string |         | Yes      | List of kafka brokers                                                                                            |
+| kafka.topics             | []string |         | Yes      | List of kafka topics with messages to analyze                                                                    |
+| kafka.group              | string   |         | Yes      | Kafka group for this app                                                                                         |
+| kafka.client_id          | string   |         | Yes      | Kafka client id for this app                                                                                     |
 | forwarder.ban_target_url | string   |         | Yes      | Url to endpoint, implementing [this](https://github.com/crypto-pepe/firewall/wiki/Banned-Targets#ban-target) api |
-| forwarder.timeout        | string   |         | No       | Timeout for requests to ban url. Duration string                                                                |
-| forwarder.retry_count    | int      |         | Yes      | Count of attempts to send request to executor                                                |
-| forwarder.retry_wait     | string   |         | Yes      | Time to wait before next try sending request to executor. Duration string                                       |
-| analyzer_id              | string   |         | Yes      | Prefix that will be added to analyzer id header                                                                 |
-| validators               | []object |         | Yes      | List of validator configs. See **Validators**                                                                   |
-| dry_run                  | bool     | false   | No       | Run firewall-analyzer in dry run mode                                                                           |                 
+| forwarder.timeout        | string   |         | No       | Timeout for requests to ban url. Duration string                                                                 |
+| forwarder.retry_count    | int      |         | Yes      | Count of attempts to send request to executor                                                                    |
+| forwarder.retry_interval | string   |         | Yes      | Time to wait before next try sending request to executor. Duration string                                        |
+| analyzer_id              | string   |         | Yes      | Prefix that will be added to analyzer id header                                                                  |
+| validators               | []object |         | Yes      | List of validator configs. See **Validators**                                                                    |
+| dry_run                  | bool     | false   | No       | Run firewall-analyzer in dry run mode                                                                            |                 
 ___
 
 Each of the configuration parameter can be overridden via the environment variable. Nested values overriding are
