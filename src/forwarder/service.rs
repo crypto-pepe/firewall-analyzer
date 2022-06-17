@@ -1,5 +1,4 @@
-use std::thread::sleep;
-use std::time::Duration;
+use std::iter::Take;
 
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
@@ -10,8 +9,7 @@ use crate::ExecutorClient;
 
 pub struct Service {
     client: Box<dyn ExecutorClient + Send + Sync>,
-    retry_count: usize,
-    retry_wait: Duration,
+    retry_strategy: Take<tokio_retry::strategy::FixedInterval>,
     analyzer_name: String,
 }
 
@@ -24,8 +22,8 @@ impl Service {
         Self {
             analyzer_name,
             client,
-            retry_count: cfg.retry_count,
-            retry_wait: cfg.retry_wait.into(),
+            retry_strategy: tokio_retry::strategy::FixedInterval::new(cfg.retry_wait.into())
+                .take(cfg.retry_count),
         }
     }
 
@@ -38,29 +36,14 @@ impl Service {
                         self.analyzer_name, validator_ban_request.validator_name
                     );
 
-                    let mut ban_result = self
-                        .client
-                        .ban(
+                    if let Err(e) = tokio_retry::Retry::spawn(self.retry_strategy.clone(), || {
+                        self.client.ban(
                             validator_ban_request.ban_request.clone(),
                             analyzer_id.clone(),
                         )
-                        .await;
-                    if ban_result.is_err() {
-                        for _ in 1..self.retry_count {
-                            sleep(self.retry_wait);
-                            ban_result = self
-                                .client
-                                .ban(
-                                    validator_ban_request.ban_request.clone(),
-                                    analyzer_id.clone(),
-                                )
-                                .await;
-                            if ban_result.is_ok() {
-                                break;
-                            }
-                        }
-                    }
-                    if let Err(e) = ban_result {
+                    })
+                    .await
+                    {
                         tracing::error!("{:?}", e)
                     }
                 }
