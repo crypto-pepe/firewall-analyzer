@@ -11,6 +11,36 @@ forwarder:
   retry_interval: 3s
 analyzer_id: "analyzer-1"
 validators:
+  - requests_from_ip_cost:
+      ban_description: "too high of price requests, go outside, touch grass"
+      limits:
+        - limit: 30
+          ban_duration: 10s
+          reset_duration: 30s
+        - limit: 20
+          ban_duration: 30s
+          reset_duration: 60s
+        - limit: 10
+          ban_duration: 60s
+          reset_duration: 120s
+      patterns:
+        - method: "GET"
+          path_regex: "/api/.*"
+          body_regex: ".*"
+          cost: 1
+        - method: "POST"
+          path_regex: "/api/.*"
+          body_regex: ".*"
+          cost: 5
+        - method: "POST"
+          path_regex: "/api/upload"
+          body_regex: ".{128, }"
+          cost: 10
+        - method: "POST"
+          path_regex: "/api/upload"
+          body_regex: ".{,127}"
+          cost: 5
+      default_cost: 5
   - requests_from_ip_counter:
       ban_description: "too many requests"
       limits:
