@@ -108,7 +108,6 @@ impl Validator for RequestsFromIPCost {
         let now = Utc::now();
 
         let cost = RequestsFromIPCost::evaluate_request(self.default_cost, &self.patterns, &req);
-        // Whether target is not banned
 
         if state.should_reset_timeout(now) {
             state.recent_requests.push((cost, now));
@@ -118,7 +117,7 @@ impl Validator for RequestsFromIPCost {
         }
 
         match state.applied_rule.clone() {
-            None => {
+            None => { // Target is not banned
                 state.recent_requests.push((cost, now));
                 state.clean_before(now - first_rule.reset_duration);
 
@@ -140,7 +139,7 @@ impl Validator for RequestsFromIPCost {
                     self.ban(first_rule.ban_duration.num_seconds() as u32, ip),
                 ))
             }
-            Some(applied_rule) => {
+            Some(applied_rule) => { // Target is banned
                 state.cost_since_last_ban += cost;
 
                 let applying_rule_idx = min(applied_rule.rule_idx + 1, self.rules.len() - 1);
