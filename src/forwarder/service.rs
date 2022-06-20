@@ -1,19 +1,29 @@
+use std::iter::Take;
+
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
 
+use crate::forwarder::config::Config;
 use crate::model::ValidatorBanRequest;
 use crate::ExecutorClient;
 
 pub struct Service {
-    client: Box<dyn ExecutorClient + Send + Sync>,
-    analyzer_name: String,
+    executor: Box<dyn ExecutorClient + Send + Sync>,
+    retry_strategy: Take<tokio_retry::strategy::FixedInterval>,
+    analyzer_id: String,
 }
 
 impl Service {
-    pub fn new(client: Box<dyn ExecutorClient + Send + Sync>, analyzer_name: String) -> Self {
+    pub fn new(
+        executor: Box<dyn ExecutorClient + Send + Sync>,
+        cfg: Config,
+        analyzer_id: String,
+    ) -> Self {
         Self {
-            client,
-            analyzer_name,
+            analyzer_id,
+            executor,
+            retry_strategy: tokio_retry::strategy::FixedInterval::new(cfg.retry_interval.into())
+                .take(cfg.retry_count),
         }
     }
 
@@ -23,12 +33,16 @@ impl Service {
                 Ok(validator_ban_request) => {
                     let analyzer_id = format!(
                         "{}:{}",
-                        self.analyzer_name, validator_ban_request.validator_name
+                        self.analyzer_id, validator_ban_request.validator_name
                     );
-                    if let Err(e) = self
-                        .client
-                        .ban(validator_ban_request.ban_request, analyzer_id)
-                        .await
+
+                    if let Err(e) = tokio_retry::Retry::spawn(self.retry_strategy.clone(), || {
+                        self.executor.ban(
+                            validator_ban_request.ban_request.clone(),
+                            analyzer_id.clone(),
+                        )
+                    })
+                    .await
                     {
                         tracing::error!("{:?}", e)
                     }

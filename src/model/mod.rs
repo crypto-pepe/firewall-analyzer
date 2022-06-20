@@ -12,20 +12,20 @@ pub struct Request {
     pub body: String,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Eq, PartialEq, Clone)]
 pub struct BanRequest {
     pub target: BanTarget,
     pub reason: String,
     pub ttl: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidatorBanRequest {
     pub ban_request: BanRequest,
     pub validator_name: String,
 }
 
-#[derive(Debug, Serialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Eq, PartialEq, Clone)]
 pub struct BanTarget {
     pub ip: Option<String>,
     pub user_agent: Option<String>,

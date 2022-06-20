@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 regex = "1.5.6"
 
+tokio-retry = "0.3.0"
+
 circular-queue = "0.2.6"
 
 chrono = "0.4.19"

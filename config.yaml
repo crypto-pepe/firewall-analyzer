@@ -6,8 +6,10 @@ kafka:
   group: 'some-group'
   client_id: 'some-client'
 forwarder:
-  url: "http://localhost:8001/api/bans"
-analyzer_name: "analyzer-1"
+  ban_target_url: "http://localhost:8001/api/bans"
+  retry_count: 3
+  retry_interval: 3s
+analyzer_id: "analyzer-1"
 validators:
   - requests_from_ip_cost:
       ban_description: "too high of price requests, go outside, touch grass"

@@ -46,11 +46,14 @@ async fn main() -> io::Result<()> {
     let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
     } else {
-        Box::new(forwarder::ExecutorHttpClient::new(&cfg.forwarder).expect("create forwarder"))
+        Box::new(
+            forwarder::ExecutorHttpClient::new(&cfg.forwarder.http_config)
+                .expect("create forwarder"),
+        )
     };
 
     let forwarder_svc =
-        forwarder::service::Service::new(executor_client, cfg.analyzer_name.clone());
+        forwarder::service::Service::new(executor_client, cfg.forwarder, cfg.analyzer_id);
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
 
