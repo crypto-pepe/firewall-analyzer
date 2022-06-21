@@ -78,22 +78,21 @@ impl Validator for RequestsFromUACounter {
         let now = Utc::now();
 
         if state.should_reset_timeout(now) {
-            state.reset(now);
+            state.reset();
+            state.push(now);
             tracing::info!(action = "reset", ua = ua.as_str());
             return Ok(None);
         }
 
-        match state.applied_rule.clone() {
+        match &state.applied_rule {
             None => {
                 state.push(now);
                 if !state.is_above_limit(now - rule.reset_duration) {
                     return Ok(None);
                 }
 
-                state.clear();
                 state.apply_rule(0, now + rule.reset_duration);
 
-                let rule = self.rules[0];
                 tracing::info!(
                     action = "ban",
                     ua = ua.as_str(),
@@ -112,7 +111,6 @@ impl Validator for RequestsFromUACounter {
                     .get(applying_rule_idx)
                     .ok_or(RulesError::NotFound(applying_rule_idx))?;
                 if state.requests_since_last_ban >= applying_rule.limit {
-                    state.clear();
                     state.apply_rule(applying_rule_idx, now + applying_rule.reset_duration);
                     tracing::info!(
                         action = "ban",

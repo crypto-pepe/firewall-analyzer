@@ -54,7 +54,7 @@ validators:
           ban_duration: 60s
           reset_duration: 120s
   - requests_from_ua_counter:
-      ban_description: "too many requests"
+      ban_description: "too many requests from user-agent"
       limits:
         - limit: 3
           ban_duration: 10s
