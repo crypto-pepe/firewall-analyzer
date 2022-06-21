@@ -8,7 +8,7 @@ use reqwest::header::USER_AGENT;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
-use crate::validators::common::{AppliedRule, BanRule, HeaderError, RulesError};
+use crate::validators::common::{BanRule, HeaderError, RulesError};
 use crate::validators::requests_from_ua_counter::Config;
 
 use super::state::State;
@@ -85,20 +85,13 @@ impl Validator for RequestsFromUACounter {
 
         match state.applied_rule.clone() {
             None => {
-                state.recent_requests.push(now);
-                if !state.recent_requests.is_full() {
-                    return Ok(None);
-                }
-                if *state.recent_requests.iter().last().unwrap() <= now - rule.reset_duration {
+                state.push(now);
+                if !state.is_above_limit(now - rule.reset_duration) {
                     return Ok(None);
                 }
 
-                state.recent_requests.clear();
-                state.requests_since_last_ban = 0;
-                state.applied_rule = Some(AppliedRule {
-                    rule_idx: 0,
-                    resets_at: now + rule.reset_duration,
-                });
+                state.clear();
+                state.apply_rule(0, now + rule.reset_duration);
 
                 let rule = self.rules[0];
                 tracing::info!(
@@ -119,11 +112,8 @@ impl Validator for RequestsFromUACounter {
                     .get(applying_rule_idx)
                     .ok_or(RulesError::NotFound(applying_rule_idx))?;
                 if state.requests_since_last_ban >= applying_rule.limit {
-                    state.applied_rule = Some(AppliedRule {
-                        rule_idx: applying_rule_idx,
-                        resets_at: now + applying_rule.reset_duration,
-                    });
-                    state.requests_since_last_ban = 0;
+                    state.clear();
+                    state.apply_rule(applying_rule_idx, now + applying_rule.reset_duration);
                     tracing::info!(
                         action = "ban",
                         ua = ua.as_str(),
