@@ -7,9 +7,8 @@ use regex::Regex;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
-use crate::validators::common::{BanRule, RulesError};
+use crate::validators::common::{AppliedRule, BanRule, RulesError};
 use crate::validators::requests_from_ip_cost::config::RequestPatternConfig;
-use crate::validators::requests_from_ip_cost::state::AppliedRule;
 use crate::validators::requests_from_ip_cost::Config;
 
 use super::state::State;
@@ -117,7 +116,8 @@ impl Validator for RequestsFromIPCost {
         }
 
         match state.applied_rule.clone() {
-            None => { // Target is not banned
+            // Target is not banned
+            None => {
                 state.recent_requests.push((cost, now));
                 state.clean_before(now - first_rule.reset_duration);
 
@@ -139,7 +139,8 @@ impl Validator for RequestsFromIPCost {
                     self.ban(first_rule.ban_duration.num_seconds() as u32, ip),
                 ))
             }
-            Some(applied_rule) => { // Target is banned
+            // Target is banned
+            Some(applied_rule) => {
                 state.cost_since_last_ban += cost;
 
                 let applying_rule_idx = min(applied_rule.rule_idx + 1, self.rules.len() - 1);

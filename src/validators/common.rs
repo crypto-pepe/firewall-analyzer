@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -28,8 +29,20 @@ impl TryFrom<BanRuleConfig> for BanRule {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct AppliedRule {
+    pub rule_idx: usize,
+    pub resets_at: DateTime<Utc>,
+}
+
 #[derive(Error, Debug)]
 pub enum RulesError {
     #[error("rule {0} not found")]
     NotFound(usize),
+}
+
+#[derive(Error, Debug)]
+pub enum HeaderError {
+    #[error("{0} header not found")]
+    NotFound(String),
 }
