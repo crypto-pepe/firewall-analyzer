@@ -8,7 +8,7 @@ use reqwest::header::USER_AGENT;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
-use crate::validators::common::{BanRule, HeaderError, RulesError};
+use crate::validators::common::{AppliedRule, BanRule, HeaderError, RulesError};
 use crate::validators::requests_from_ua_counter::Config;
 
 use super::state::State;
@@ -91,7 +91,10 @@ impl Validator for RequestsFromUACounter {
                     return Ok(None);
                 }
 
-                state.apply_rule(0, now + rule.reset_duration);
+                state.apply_rule(AppliedRule {
+                    rule_idx: 0,
+                    resets_at: now + rule.reset_duration,
+                });
 
                 tracing::info!(
                     action = "ban",
@@ -111,7 +114,10 @@ impl Validator for RequestsFromUACounter {
                     .get(applying_rule_idx)
                     .ok_or(RulesError::NotFound(applying_rule_idx))?;
                 if state.requests_since_last_ban >= applying_rule.limit {
-                    state.apply_rule(applying_rule_idx, now + applying_rule.reset_duration);
+                    state.apply_rule(AppliedRule {
+                        rule_idx: applying_rule_idx,
+                        resets_at: now + applying_rule.reset_duration,
+                    });
                     tracing::info!(
                         action = "ban",
                         ua = ua.as_str(),
