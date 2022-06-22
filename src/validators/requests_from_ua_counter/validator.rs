@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use chrono::prelude::*;
@@ -75,25 +76,25 @@ impl Validator for RequestsFromUACounter {
             .entry(ua.clone())
             .or_insert_with(|| State::new(rule.limit as usize));
 
-        let now = Utc::now();
+        let request_time: DateTime<Utc> = DateTime::from_str(&req.timestamp)?;
 
-        if state.should_reset_timeout(now) {
+        if state.should_reset_timeout(request_time) {
             state.reset();
-            state.push(now);
+            state.push(request_time);
             tracing::info!(action = "reset", ua = ua.as_str());
             return Ok(None);
         }
 
         match &state.applied_rule {
             None => {
-                state.push(now);
-                if !state.is_above_limit(now - rule.reset_duration) {
+                state.push(request_time);
+                if !state.is_above_limit(request_time - rule.reset_duration) {
                     return Ok(None);
                 }
 
                 state.apply_rule(AppliedRule {
                     rule_idx: 0,
-                    resets_at: now + rule.reset_duration,
+                    resets_at: request_time + rule.reset_duration,
                 });
 
                 tracing::info!(
@@ -116,7 +117,7 @@ impl Validator for RequestsFromUACounter {
                 if state.requests_since_last_ban >= applying_rule.limit {
                     state.apply_rule(AppliedRule {
                         rule_idx: applying_rule_idx,
-                        resets_at: now + applying_rule.reset_duration,
+                        resets_at: request_time + applying_rule.reset_duration,
                     });
                     tracing::info!(
                         action = "ban",
@@ -143,10 +144,11 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Error;
-    use chrono::Duration;
+    use chrono::{Duration, Utc};
     use regex::Regex;
     use reqwest::header::USER_AGENT;
 
+    use crate::model::Body::Original;
     use crate::model::{BanRequest, BanTarget, Request};
     use crate::validation_provider::Validator;
     use crate::validators::common::{BanRule, HeaderError};
@@ -191,31 +193,33 @@ mod tests {
 
     pub struct TestCase {
         //request, sleep before request
-        pub input: Vec<(Request, Duration)>,
+        pub input: Vec<Request>,
         pub want_last: Option<Result<Option<BanRequest>, Error>>,
         pub want_every: Option<Vec<Option<BanRequest>>>,
         pub want_error: Option<Error>,
     }
 
-    fn req_with_ua(ua: &str) -> Request {
+    fn req_with_ua(ua: &str, wait_secs: i64) -> Request {
         Request {
+            timestamp: (Utc::now() + Duration::seconds(wait_secs)).to_string(),
             remote_ip: "".to_string(),
             host: "".to_string(),
             method: "".to_string(),
             path: "".to_string(),
             headers: HashMap::from([("User-Agent".to_string(), ua.to_string())]),
-            body: "".to_string(),
+            body: Original("".to_string()),
         }
     }
 
-    fn empty_request() -> Request {
+    fn empty_request(wait_secs: i64) -> Request {
         Request {
+            timestamp: (Utc::now() + Duration::seconds(wait_secs)).to_string(),
             remote_ip: "".to_string(),
             host: "".to_string(),
             method: "".to_string(),
             path: "".to_string(),
             headers: HashMap::default(),
-            body: "".to_string(),
+            body: Original("".to_string()),
         }
     }
 
@@ -223,9 +227,9 @@ mod tests {
     fn exceed_requests_leads_to_ban() {
         let tc = TestCase {
             input: vec![
-                (req_with_ua("AAA"), Duration::seconds(0)),
-                (req_with_ua("AAA"), Duration::seconds(0)),
-                (req_with_ua("AAA"), Duration::seconds(0)),
+                req_with_ua("AAA", 0),
+                req_with_ua("AAA", 0),
+                req_with_ua("AAA", 0),
             ],
             want_last: Some(Ok(Some(BanRequest {
                 target: BanTarget {
@@ -245,7 +249,7 @@ mod tests {
     #[test]
     fn not_exceed_requests_doesnt_lead_to_ban() {
         let tc = TestCase {
-            input: vec![(req_with_ua("123"), Duration::seconds(0))],
+            input: vec![req_with_ua("123", 0)],
             want_last: Some(Ok(None)),
             want_every: None,
             want_error: None,
@@ -258,9 +262,9 @@ mod tests {
     fn waiting_before_last_request_doesnt_lead_to_ban() {
         let tc = TestCase {
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(2)),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 2),
             ],
             want_last: Some(Ok(None)),
             want_every: Some(vec![None, None, None]),
@@ -274,11 +278,11 @@ mod tests {
     fn rate_limit_doesnt_lead_to_ban() {
         let tc = TestCase {
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(1)),
-                (req_with_ua("123"), Duration::seconds(1)),
-                (req_with_ua("123"), Duration::seconds(1)),
-                (req_with_ua("123"), Duration::seconds(1)),
+                req_with_ua("123", 0),
+                req_with_ua("123", 1),
+                req_with_ua("123", 2),
+                req_with_ua("123", 3),
+                req_with_ua("123", 4),
             ],
             want_last: None,
             want_every: Some(vec![None, None, None, None, None]),
@@ -293,10 +297,10 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -322,11 +326,11 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -360,15 +364,15 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("AAA"), Duration::seconds(0)),
-                (req_with_ua("BBB"), Duration::seconds(0)),
-                (req_with_ua("BBB"), Duration::seconds(0)),
-                (req_with_ua("BBB"), Duration::seconds(0)),
-                (req_with_ua("BBB"), Duration::seconds(0)),
-                (req_with_ua("BBB"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
+                req_with_ua("123", 0),
+                req_with_ua("AAA", 0),
+                req_with_ua("BBB", 0),
+                req_with_ua("BBB", 0),
+                req_with_ua("BBB", 0),
+                req_with_ua("BBB", 0),
+                req_with_ua("BBB", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -413,12 +417,12 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)), // None
-                (req_with_ua("123"), Duration::seconds(0)), // None
-                (req_with_ua("123"), Duration::seconds(0)), // banned for 1s, 2s reset
-                (req_with_ua("123"), Duration::seconds(2)), // currently unbanned
-                (req_with_ua("123"), Duration::seconds(0)), // None
-                (req_with_ua("123"), Duration::seconds(0)), // banned for 1s, 2s reset
+                req_with_ua("123", 0), // None
+                req_with_ua("123", 0), // None
+                req_with_ua("123", 0), // banned for 1s, 2s reset
+                req_with_ua("123", 3), // currently unbanned
+                req_with_ua("123", 3), // None
+                req_with_ua("123", 3), // banned for 1s, 2s reset
             ],
             want_last: None,
             want_every: Some(vec![
@@ -452,7 +456,7 @@ mod tests {
     fn error_when_no_user_agent() {
         let tc = TestCase {
             want_error: Some(HeaderError::NotFound(USER_AGENT.to_string()).into()),
-            input: vec![(empty_request(), Duration::seconds(0))],
+            input: vec![empty_request(0)],
             want_last: None,
             want_every: None,
         };
@@ -465,10 +469,10 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("some ua"), Duration::seconds(0)),
-                (req_with_ua("some ua"), Duration::seconds(0)),
-                (req_with_ua("some ua"), Duration::seconds(0)),
-                (req_with_ua("some ua"), Duration::seconds(0)),
+                req_with_ua("some ua", 0),
+                req_with_ua("some ua", 0),
+                req_with_ua("some ua", 0),
+                req_with_ua("some ua", 0),
             ],
             want_last: None,
             want_every: Some(vec![None, None, None, None]),
@@ -482,13 +486,13 @@ mod tests {
         let tc = TestCase {
             want_error: None,
             input: vec![
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)),
-                (req_with_ua("123"), Duration::seconds(0)), // 1st
-                (req_with_ua("123"), Duration::seconds(0)), //
-                (req_with_ua("123"), Duration::seconds(0)), // 2nd
-                (req_with_ua("123"), Duration::seconds(0)), // 3rd
-                (req_with_ua("123"), Duration::seconds(0)), // 4th
+                req_with_ua("123", 0),
+                req_with_ua("123", 0),
+                req_with_ua("123", 0), // 1st
+                req_with_ua("123", 0), //
+                req_with_ua("123", 0), // 2nd
+                req_with_ua("123", 0), // 3rd
+                req_with_ua("123", 0), // 4th
             ],
             want_last: None,
             want_every: Some(vec![
@@ -536,8 +540,7 @@ mod tests {
     fn run_test(tc: TestCase) {
         let mut results = vec![];
         let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
+        for req in tc.input {
             match v.validate(req) {
                 Ok(r) => results.push(r),
                 Err(got) => match tc.want_error {

@@ -1,11 +1,12 @@
 use std::cmp::min;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use chrono::prelude::*;
 use regex::Regex;
 
-use crate::model::{BanRequest, BanTarget, Request};
+use crate::model::{BanRequest, BanTarget, Body, Request};
 use crate::validation_provider::Validator;
 use crate::validators::common::{AppliedRule, BanRule, RulesError};
 use crate::validators::requests_from_ip_cost::config::RequestPatternConfig;
@@ -86,7 +87,10 @@ impl RequestsFromIPCost {
                     && p.path_pattern.is_match(req.path.as_str())
                     && p.body_pattern
                         .clone()
-                        .map(|p| p.is_match(req.body.as_str()))
+                        .map(|p| match &req.body {
+                            Body::Original(body) => p.is_match(body.as_str()),
+                            Body::Skipped => true,
+                        })
                         .unwrap_or(true))
                 .then(|| p.cost)
             })
@@ -104,12 +108,12 @@ impl Validator for RequestsFromIPCost {
             .entry(ip.clone())
             .or_insert_with(|| State::new(first_rule.limit));
 
-        let now = Utc::now();
+        let request_time: DateTime<Utc> = DateTime::from_str(&req.timestamp)?;
 
         let cost = RequestsFromIPCost::evaluate_request(self.default_cost, &self.patterns, &req);
 
-        if state.should_reset_timeout(now) {
-            state.recent_requests.push((cost, now));
+        if state.should_reset_timeout(request_time) {
+            state.recent_requests.push((cost, request_time));
             state.applied_rule = None;
             tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
@@ -118,15 +122,15 @@ impl Validator for RequestsFromIPCost {
         match state.applied_rule.clone() {
             // Target is not banned
             None => {
-                state.recent_requests.push((cost, now));
-                state.clean_before(now - first_rule.reset_duration);
+                state.recent_requests.push((cost, request_time));
+                state.clean_before(request_time - first_rule.reset_duration);
 
-                if !state.is_limit_reached(now - first_rule.reset_duration) {
+                if !state.is_limit_reached(request_time - first_rule.reset_duration) {
                     return Ok(None);
                 }
                 state.applied_rule = Some(AppliedRule {
                     rule_idx: 0,
-                    resets_at: now + first_rule.reset_duration,
+                    resets_at: request_time + first_rule.reset_duration,
                 });
 
                 tracing::info!(
@@ -152,7 +156,7 @@ impl Validator for RequestsFromIPCost {
                 if state.cost_since_last_ban >= applying_rule.limit {
                     state.applied_rule = Some(AppliedRule {
                         rule_idx: applying_rule_idx,
-                        resets_at: now + applying_rule.reset_duration,
+                        resets_at: request_time + applying_rule.reset_duration,
                     });
                     state.cost_since_last_ban = 0;
                     tracing::info!(
@@ -178,8 +182,9 @@ impl Validator for RequestsFromIPCost {
 #[cfg(test)]
 mod tests {
     use anyhow::Error;
-    use chrono::Duration;
+    use chrono::{Duration, Utc};
 
+    use crate::model::Body::Original;
     use crate::model::{BanRequest, BanTarget, Request};
     use crate::validation_provider::Validator;
     use crate::validators::common::BanRule;
@@ -263,20 +268,21 @@ mod tests {
         }
     }
 
-    fn base_req(ip: &str, method: &str, path: &str, body: &str) -> Request {
+    fn base_req(ip: &str, method: &str, path: &str, body: &str, wait_secs: i64) -> Request {
         Request {
+            timestamp: (Utc::now() + Duration::seconds(wait_secs)).to_string(),
             remote_ip: ip.to_string(),
             host: "".to_string(),
             method: method.to_string().to_uppercase(),
             path: path.to_string(),
             headers: Default::default(),
-            body: body.to_string(),
+            body: Original(body.to_string()),
         }
     }
 
     pub struct TestCase {
         //request, sleep before request
-        pub input: Vec<(Request, Duration)>,
+        pub input: Vec<Request>,
         pub want_last: Option<Result<Option<BanRequest>, Error>>,
         pub want_every: Option<Vec<Option<BanRequest>>>,
     }
@@ -285,30 +291,12 @@ mod tests {
     fn choose_correct_pattern() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/unknown_pattern/1", ""),
-                    Duration::seconds(0),
-                ), // + 5
-                (
-                    base_req("1.1.1.1", "POST", "/unknown_pattern/2", ""),
-                    Duration::seconds(0),
-                ), // + 5
-                (
-                    base_req("1.1.1.1", "POST", "/unknown_pattern/3", ""),
-                    Duration::seconds(0),
-                ), // + 5
-                (
-                    base_req("1.1.1.1", "POST", "/aaaaaaa", ""),
-                    Duration::seconds(0),
-                ), // + 5
-                (
-                    base_req("1.1.1.1", "POST", "/bbbbb/2", ""),
-                    Duration::seconds(0),
-                ), // + 5
-                (
-                    base_req("1.1.1.1", "POST", "/unknown_pattern/2&123", ""),
-                    Duration::seconds(0),
-                ), // + 5 = 30
+                base_req("1.1.1.1", "POST", "/unknown_pattern/1", "", 0),
+                base_req("1.1.1.1", "POST", "/unknown_pattern/2", "", 0),
+                base_req("1.1.1.1", "POST", "/unknown_pattern/3", "", 0),
+                base_req("1.1.1.1", "POST", "/aaaaaaa", "", 0),
+                base_req("1.1.1.1", "POST", "/bbbbb/2", "", 0),
+                base_req("1.1.1.1", "POST", "/unknown_pattern/2&123", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -336,14 +324,8 @@ mod tests {
     fn choose_rule_with_max_cost() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/123", "big payload"),
-                    Duration::seconds(0),
-                ), // + 29
-                (
-                    base_req("1.1.1.1", "GET", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // + 1 = 30
+                base_req("1.1.1.1", "POST", "/123", "big payload", 0),
+                base_req("1.1.1.1", "GET", "/cost/1", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -366,18 +348,9 @@ mod tests {
     fn exceed_cost_leads_to_ban() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
             ],
             want_last: Some(Ok(Some(BanRequest {
                 target: BanTarget {
@@ -397,22 +370,10 @@ mod tests {
     fn not_exceed_cost_doesnt_lead_to_ban() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "GET", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "GET", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "GET", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "GET", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
+                base_req("1.1.1.1", "GET", "/cost/1", "", 0),
+                base_req("1.1.1.1", "GET", "/cost/1", "", 0),
+                base_req("1.1.1.1", "GET", "/cost/1", "", 0),
+                base_req("1.1.1.1", "GET", "/cost/1", "", 0),
             ],
             want_last: Some(Ok(None)),
             want_every: None,
@@ -425,18 +386,9 @@ mod tests {
     fn waiting_before_last_request_doesnt_lead_to_ban() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/2", ""),
-                    Duration::seconds(2),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/2", "", 2),
             ],
             want_last: Some(Ok(None)),
             want_every: Some(vec![None, None, None]),
@@ -449,26 +401,11 @@ mod tests {
     fn rate_limit_doesnt_lead_to_ban() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(1),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(1),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(1),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(1),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 1),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 2),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 3),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 4),
             ],
             want_last: None,
             want_every: Some(vec![None, None, None, None, None]),
@@ -481,22 +418,10 @@ mod tests {
     fn request_while_banned_leads_to_nothing() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -521,26 +446,11 @@ mod tests {
     fn exceed_requests_after_first_ban_leads_to_new_ban() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -573,34 +483,13 @@ mod tests {
     fn one_ip_provides_ban_only_for_itself() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("2.2.2.2", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("3.3.3.3", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("3.3.3.3", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("3.3.3.3", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("2.2.2.2", "POST", "/cost/1", "", 0),
+                base_req("3.3.3.3", "POST", "/cost/1", "", 0),
+                base_req("3.3.3.3", "POST", "/cost/1", "", 0),
+                base_req("3.3.3.3", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -635,30 +524,12 @@ mod tests {
     fn after_reset_baned_by_first_rule() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // None
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // None
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // banned for 1s, 2s reset
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(2),
-                ), // currently unbanned
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // None
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // banned for 1s, 2s reset
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 2),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 2),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 2),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -692,34 +563,13 @@ mod tests {
     fn same_ban_after_exceed_last_limit_again() {
         let tc = TestCase {
             input: vec![
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ),
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // 1st
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), //
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // 2nd
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // 3rd
-                (
-                    base_req("1.1.1.1", "POST", "/cost/1", ""),
-                    Duration::seconds(0),
-                ), // 4th
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
+                base_req("1.1.1.1", "POST", "/cost/1", "", 0),
             ],
             want_last: None,
             want_every: Some(vec![
@@ -767,8 +617,7 @@ mod tests {
     fn run_test(tc: TestCase) {
         let mut results = vec![];
         let mut v = get_default_validator();
-        for (req, dur) in tc.input {
-            std::thread::sleep(dur.to_std().unwrap());
+        for req in tc.input {
             if let Ok(r) = v.validate(req) {
                 results.push(r);
             }

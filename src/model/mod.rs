@@ -2,14 +2,21 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum Body {
+    Original(String),
+    Skipped,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Request {
+    pub timestamp: String,
     pub remote_ip: String,
     pub host: String,
     pub method: String,
     pub path: String,
     pub headers: HashMap<String, String>,
-    pub body: String,
+    pub body: Body,
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq, Clone)]

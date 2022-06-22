@@ -38,7 +38,7 @@ impl State {
         if !self.recent_requests.is_full() {
             return false;
         }
-        *self.recent_requests.iter().last().unwrap() <= by_time
+        *self.recent_requests.iter().last().unwrap() >= by_time
     }
 
     pub fn apply_rule(&mut self, applied_rule: AppliedRule) {

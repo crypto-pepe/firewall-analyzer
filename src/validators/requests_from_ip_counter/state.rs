@@ -19,12 +19,11 @@ impl State {
         }
     }
 
-    pub fn should_reset_timeout(&self) -> bool {
-        self.resets_at <= Utc::now() && self.applied_rule_idx.is_some()
+    pub fn should_reset_timeout(&self, by_time: DateTime<Utc>) -> bool {
+        self.resets_at <= by_time && self.applied_rule_idx.is_some()
     }
 
-    pub fn reset(&mut self, last_request_time: DateTime<Utc>) {
-        self.recent_requests.push(last_request_time);
+    pub fn reset(&mut self) {
         self.applied_rule_idx = None;
     }
 }
