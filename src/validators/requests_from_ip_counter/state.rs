@@ -30,7 +30,7 @@ impl State {
         self.applied_rule = None;
     }
 
-    pub fn push(&mut self, time: DateTime<Utc>) {
+    pub fn add_request_time(&mut self, time: DateTime<Utc>) {
         self.recent_requests.push(time);
     }
 

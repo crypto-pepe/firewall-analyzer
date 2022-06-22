@@ -58,14 +58,14 @@ impl Validator for RequestsFromIPCounter {
 
         if state.should_reset_timeout(request_time) {
             state.reset();
-            state.push(request_time);
+            state.add_request_time(request_time);
             tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
         }
 
         match &state.applied_rule {
             None => {
-                state.push(request_time);
+                state.add_request_time(request_time);
                 if !state.is_above_limit(request_time - rule.reset_duration) {
                     return Ok(None);
                 }
