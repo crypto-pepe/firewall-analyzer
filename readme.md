@@ -60,6 +60,19 @@ Example:
 | limits.ban_duration   | string |         | Yes      | TTL for banned target. Duration string      |
 | limits.reset_duration | string |         | Yes      | Duration for resetting ban. Duration string |
 
+### requests_from_ua_count
+Analyzes only user agents, that matches one of patterns
+
+#### Config
+
+| Name                  | Type     | Default | Required | Note                                        |
+|-----------------------|----------|---------|----------|---------------------------------------------|
+| ban_description       | string   |         | Yes      | Reason sending to executor                  |
+| limits.limit          | int      |         | Yes      | Count of requests allowed on current limit  |
+| limits.ban_duration   | string   |         | Yes      | TTL for banned target. Duration string      |
+| limits.reset_duration | string   |         | Yes      | Duration for resetting ban. Duration string |
+| patterns              | []string |         | Yes      | Regexps for user agent                      |
+
 ### requests_from_ip_cost
 Bans ip if total requests cost reaches limit. Cost of first matching pattern is chosen. If there is no matching patterns 
 then default cost is used. 

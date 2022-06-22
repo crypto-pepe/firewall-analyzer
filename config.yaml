@@ -53,5 +53,20 @@ validators:
         - limit: 1
           ban_duration: 60s
           reset_duration: 120s
+  - requests_from_ua_counter:
+      ban_description: "too many requests from user-agent"
+      limits:
+        - limit: 3
+          ban_duration: 10s
+          reset_duration: 30s
+        - limit: 2
+          ban_duration: 30s
+          reset_duration: 60s
+        - limit: 1
+          ban_duration: 60s
+          reset_duration: 120s
+      patterns:
+        - '.*curl.*'
+        - '.*wget.*'
 telemetry:
   svc_name: "firewall-analyzer"

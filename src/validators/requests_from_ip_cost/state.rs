@@ -1,10 +1,5 @@
+use crate::validators::common::AppliedRule;
 use chrono::{DateTime, Utc};
-
-#[derive(Debug, Clone)]
-pub struct AppliedRule {
-    pub rule_idx: usize,
-    pub resets_at: DateTime<Utc>,
-}
 
 #[derive(Debug)]
 pub(crate) struct State {
