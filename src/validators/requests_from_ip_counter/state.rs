@@ -1,29 +1,50 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use circular_queue::CircularQueue;
+
+use crate::validators::common::AppliedRule;
 
 #[derive(Debug)]
 pub(crate) struct State {
     pub requests_since_last_ban: u64,
-    pub applied_rule_idx: Option<usize>,
+    pub applied_rule: Option<AppliedRule>,
     pub recent_requests: CircularQueue<DateTime<Utc>>,
-    pub resets_at: DateTime<Utc>,
 }
 
 impl State {
     pub fn new(requests_limit: usize) -> Self {
         Self {
             requests_since_last_ban: 0,
-            applied_rule_idx: None,
+            applied_rule: None,
             recent_requests: CircularQueue::with_capacity(requests_limit),
-            resets_at: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc),
         }
     }
 
     pub fn should_reset_timeout(&self, by_time: DateTime<Utc>) -> bool {
-        self.resets_at <= by_time && self.applied_rule_idx.is_some()
+        match self.applied_rule {
+            None => false,
+            Some(AppliedRule { resets_at, .. }) => resets_at <= by_time,
+        }
     }
 
     pub fn reset(&mut self) {
-        self.applied_rule_idx = None;
+        self.applied_rule = None;
+    }
+
+    pub fn push(&mut self, time: DateTime<Utc>) {
+        self.recent_requests.push(time);
+    }
+
+    pub fn is_above_limit(&self, by_time: DateTime<Utc>) -> bool {
+        if !self.recent_requests.is_full() {
+            return false;
+        }
+        *self.recent_requests.iter().last().unwrap() >= by_time
+    }
+
+    pub fn apply_rule(&mut self, applied_rule: AppliedRule) {
+        self.recent_requests.clear();
+        self.requests_since_last_ban = 0;
+
+        self.applied_rule = Some(applied_rule);
     }
 }

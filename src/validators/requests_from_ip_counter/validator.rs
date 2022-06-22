@@ -9,7 +9,7 @@ use super::state::State;
 
 use crate::model::{BanRequest, BanTarget, Request};
 use crate::validation_provider::Validator;
-use crate::validators::common::{BanRule, RulesError};
+use crate::validators::common::{AppliedRule, BanRule, RulesError};
 use crate::validators::requests_from_ip_counter::Config;
 
 pub struct RequestsFromIPCounter {
@@ -56,77 +56,65 @@ impl Validator for RequestsFromIPCounter {
 
         let request_time: DateTime<Utc> = DateTime::from_str(&req.timestamp)?;
 
-        // Whether target is not banned
-        if state.applied_rule_idx.is_none() {
-            state.recent_requests.push(request_time);
-            if !state.recent_requests.is_full() {
-                return Ok(None);
-            }
-            if *state.recent_requests.iter().last().unwrap() <= request_time - rule.reset_duration {
-                return Ok(None);
-            }
-
-            state.resets_at = request_time + rule.reset_duration;
-            state.recent_requests.clear();
-            state.requests_since_last_ban = 0;
-            state.applied_rule_idx = Some(0);
-
-            let rule = self.rules[0];
-            tracing::info!(
-                action = "ban",
-                ip = ip.as_str(),
-                limit = rule.limit,
-                ttl = rule.ban_duration.num_seconds()
-            );
-            return Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)));
-        }
-
         if state.should_reset_timeout(request_time) {
             state.reset();
-            state.recent_requests.push(request_time);
+            state.push(request_time);
             tracing::info!(action = "reset", ip = ip.as_str());
             return Ok(None);
         }
 
-        state.requests_since_last_ban += 1;
+        match &state.applied_rule {
+            None => {
+                state.push(request_time);
+                if !state.is_above_limit(request_time - rule.reset_duration) {
+                    return Ok(None);
+                }
 
-        let rule_idx = state
-            .applied_rule_idx
-            .map_or(0, |v| min(v + 1, self.rules.len() - 1));
+                state.apply_rule(AppliedRule {
+                    rule_idx: 0,
+                    resets_at: request_time + rule.reset_duration,
+                });
 
-        if apply_rule_if_possible(state, &self.rules, rule_idx, request_time)? {
-            let rule = self.rules[rule_idx];
-            tracing::info!(
-                action = "ban",
-                ip = ip.as_str(),
-                limit = rule.limit,
-                ttl = rule.ban_duration.num_seconds()
-            );
-            return Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)));
+                tracing::info!(
+                    action = "ban",
+                    ip = ip.as_str(),
+                    limit = rule.limit,
+                    ttl = rule.ban_duration.num_seconds()
+                );
+                Ok(Some(self.ban(rule.ban_duration.num_seconds() as u32, ip)))
+            }
+            Some(applied_rule) => {
+                state.requests_since_last_ban += 1;
+
+                let applying_rule_idx = min(applied_rule.rule_idx + 1, self.rules.len() - 1);
+
+                let applying_rule = self
+                    .rules
+                    .get(applying_rule_idx)
+                    .ok_or(RulesError::NotFound(applying_rule_idx))?;
+                if state.requests_since_last_ban >= applying_rule.limit {
+                    state.apply_rule(AppliedRule {
+                        rule_idx: applying_rule_idx,
+                        resets_at: request_time + applying_rule.reset_duration,
+                    });
+                    tracing::info!(
+                        action = "ban",
+                        ip = ip.as_str(),
+                        limit = applying_rule.limit,
+                        ttl = applying_rule.ban_duration.num_seconds()
+                    );
+                    return Ok(Some(
+                        self.ban(applying_rule.ban_duration.num_seconds() as u32, ip),
+                    ));
+                }
+                Ok(None)
+            }
         }
-
-        Ok(None)
     }
 
     fn name(&self) -> String {
         "requests-from-ip-counter".into()
     }
-}
-
-fn apply_rule_if_possible(
-    state: &mut State,
-    rules: &[BanRule],
-    rule_idx: usize,
-    last_request_time: DateTime<Utc>,
-) -> Result<bool, RulesError> {
-    let rule = rules.get(rule_idx).ok_or(RulesError::NotFound(rule_idx))?;
-    if state.requests_since_last_ban >= rule.limit {
-        state.resets_at = last_request_time + rule.reset_duration;
-        state.requests_since_last_ban = 0;
-        state.applied_rule_idx = Some(rule_idx + 1);
-        return Ok(true);
-    }
-    Ok(false)
 }
 
 #[cfg(test)]
