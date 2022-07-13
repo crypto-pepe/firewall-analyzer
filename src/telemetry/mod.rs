@@ -1,22 +1,18 @@
 use opentelemetry::sdk::trace::Tracer;
 use tracing::subscriber::set_global_default;
 use tracing::Subscriber;
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::{EnvFilter, Registry};
+use tracing_subscriber::{fmt, EnvFilter, Registry};
 
 pub mod config;
 pub use self::config::Config;
 
 pub fn get_subscriber(cfg: &Config) -> Box<dyn Subscriber + Send + Sync> {
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let formatting_layer = BunyanFormattingLayer::new(cfg.svc_name.to_string(), std::io::stdout);
+    let env_filter = EnvFilter::from_default_env();
+    let fmt_layer = fmt::Layer::default();
 
-    let reg = Registry::default()
-        .with(env_filter)
-        .with(JsonStorageLayer)
-        .with(formatting_layer);
+    let reg = Registry::default().with(env_filter).with(fmt_layer);
 
     if cfg.jaeger_endpoint.is_some() {
         let ep = cfg.jaeger_endpoint.as_ref().unwrap();
