@@ -57,7 +57,7 @@ impl RequestConsumer for KafkaRequestConsumer {
             let mss = match consumer.lock().await.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
-                    tracing::error!("{:?}", e);
+                    tracing::error!("failed to poll: {:?}", e);
                     continue;
                 }
             };
@@ -72,7 +72,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                         .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
                             Ok(r) => Some(r),
                             Err(e) => {
-                                tracing::error!("{:?}", e);
+                                tracing::error!("failed to deserialize requests: {:?}", e);
                                 None
                             }
                         })
@@ -89,8 +89,11 @@ impl RequestConsumer for KafkaRequestConsumer {
                         .map_err(|e| e.into())
                 })
                 .await?;
+
+            debug!("messagesets consumed");
+
             if let Err(e) = consumer.lock().await.commit_consumed() {
-                tracing::error!("{:?}", e);
+                tracing::error!("failed to commit consumed: {:?}", e);
             };
 
             debug!("messagesets sucessfully consumed");
