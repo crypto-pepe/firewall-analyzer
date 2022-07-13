@@ -88,14 +88,11 @@ impl RequestConsumer for KafkaRequestConsumer {
                 tracing::error!("failed to commit consumed: {:?}", e);
             };
 
-            debug!(
-                "messagesets sucessfully consumed, sleep for {:?}",
-                self.consuming_delay
-            );
+            debug!("messagesets sucessfully consumed",);
 
-            tokio::time::sleep(self.consuming_delay).await;
+            // tokio::time::sleep(self.consuming_delay).await;
 
-            debug!("sleeped for {:?}", self.consuming_delay);
+            // debug!("sleeped for {:?}", self.consuming_delay);
         }
     }
 }
