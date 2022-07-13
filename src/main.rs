@@ -63,7 +63,7 @@ async fn main() -> io::Result<()> {
     tokio::select! {
         res = request_consumer_handle => {
             if let Err(e) = res {
-                error!("request consumed failed: {:?}", e);
+                tracing::error!("request consumer failed: {:?}", e);
             } else  {
                 info!("request consumer finished");
             }
@@ -71,19 +71,18 @@ async fn main() -> io::Result<()> {
 
         res = forwarder_handle => {
           if let Err(e) = res {
-            error!("forwarder failed: {:?}", e);
+              tracing::error!("forwarder failed: {:?}", e);
           } else {
-             info!("forwarder finished");
+              tracing::info!("forwarder finished");
           }
         },
 
         res = validator_handle => {
             if let Err(e) = res {
-                error!("validator failed: {:?}", e)
+                tracing::error!("validator failed: {:?}", e);
             } else  {
-                info!("validator finished");
+                tracing::info!("validator provider finished");
             }
-
         }
     }
 

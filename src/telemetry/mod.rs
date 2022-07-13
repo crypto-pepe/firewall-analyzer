@@ -11,6 +11,7 @@ pub use self::config::Config;
 pub fn get_subscriber(cfg: &Config) -> Box<dyn Subscriber + Send + Sync> {
     let env_filter = EnvFilter::from_default_env();
     let fmt_layer = fmt::Layer::default();
+
     let reg = Registry::default().with(env_filter).with(fmt_layer);
 
     if cfg.jaeger_endpoint.is_some() {

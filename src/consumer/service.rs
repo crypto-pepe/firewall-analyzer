@@ -61,38 +61,39 @@ impl RequestConsumer for KafkaRequestConsumer {
                 }
             };
 
-            let mut consumer = consumer.lock().await;
+            let stream = stream::iter(mss.iter().map::<Result<MessageSet>, _>(Ok));
 
-            mss.iter().try_for_each(|ms| {
-                ms.messages()
-                    .iter()
-                    .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
-                        Ok(r) => Some(r),
-                        Err(e) => {
-                            tracing::error!("failed to deserialize requests: {:?}", e);
-                            None
-                        }
-                    })
-                    .flatten()
-                    .map(|req| out.blocking_send(req).map_err(|e| anyhow::anyhow!(e)))
-                    .collect::<Result<Vec<_>, anyhow::Error>>()?;
+            stream
+                .try_for_each(|ms| async {
+                    let fs = ms
+                        .messages()
+                        .iter()
+                        .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
+                            Ok(r) => Some(r),
+                            Err(e) => {
+                                tracing::error!("failed to deserialize requests: {:?}", e);
+                                None
+                            }
+                        })
+                        .flatten()
+                        .map(|req| out.send(req))
+                        .collect::<Vec<_>>();
 
-                consumer
-                    .consume_messageset(ms)
-                    .map_err(|e| anyhow::anyhow!(e))
-            })?;
+                    futures::future::try_join_all(fs).await?;
 
-            debug!("commiting consumed");
+                    consumer
+                        .lock()
+                        .await
+                        .consume_messageset(ms)
+                        .map_err(|e| e.into())
+                })
+                .await?;
 
-            if let Err(e) = consumer.commit_consumed() {
+            if let Err(e) = consumer.lock().await.commit_consumed() {
                 tracing::error!("failed to commit consumed: {:?}", e);
             };
 
-            debug!("messagesets sucessfully consumed",);
-
-            // tokio::time::sleep(self.consuming_delay).await;
-
-            // debug!("sleeped for {:?}", self.consuming_delay);
+            debug!("messagesets sucessfully consumed");
         }
     }
 }
