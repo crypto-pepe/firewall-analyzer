@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use futures::executor::block_on;
+
 use futures::{stream, TryStreamExt};
 use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
 use kafka::Error;
@@ -40,7 +40,7 @@ impl KafkaRequestConsumer {
 
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<()> {
+    async fn run(&mut self, out: mpsc::UnboundedSender<Request>) -> Result<()> {
         loop {
             let consumer = Arc::new(Mutex::new(&mut self.consumer));
             let consumer = consumer.clone();
@@ -66,7 +66,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                             }
                         })
                         .flatten()
-                        .map(|req| block_on(out.send(req)))
+                        .map(|req| out.send(req))
                         .collect::<Result<Vec<_>, _>>()?;
 
                     consumer

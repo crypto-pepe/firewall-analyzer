@@ -38,8 +38,8 @@ async fn main() -> io::Result<()> {
         .expect("setup validators");
     let mut validator_svc = validation_provider::service::Service::from_validators(validators);
 
-    let (s, r) = mpsc::channel(5);
-    let (fs, fr) = mpsc::channel::<model::ValidatorBanRequest>(5);
+    let (s, r) = mpsc::unbounded_channel();
+    let (fs, fr) = mpsc::unbounded_channel::<model::ValidatorBanRequest>();
 
     let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
 

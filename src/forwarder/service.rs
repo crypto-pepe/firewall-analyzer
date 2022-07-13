@@ -1,7 +1,7 @@
 use std::iter::Take;
 
 use tokio::sync::mpsc::error::TryRecvError;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::forwarder::config::Config;
 use crate::model::ValidatorBanRequest;
@@ -27,7 +27,7 @@ impl Service {
         }
     }
 
-    pub async fn run(&self, mut recv: Receiver<ValidatorBanRequest>) {
+    pub async fn run(&self, mut recv: UnboundedReceiver<ValidatorBanRequest>) {
         loop {
             match recv.try_recv() {
                 Ok(validator_ban_request) => {

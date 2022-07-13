@@ -1,6 +1,5 @@
-use futures::future::join_all;
 use tokio::sync::mpsc::error::TryRecvError;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::error::ProcessingError;
 use crate::model;
@@ -18,8 +17,8 @@ impl Service {
 
     pub async fn run(
         &mut self,
-        mut recv: Receiver<model::Request>,
-        send: Sender<ValidatorBanRequest>,
+        mut recv: UnboundedReceiver<model::Request>,
+        send: UnboundedSender<ValidatorBanRequest>,
     ) -> Result<(), ProcessingError<ValidatorBanRequest>> {
         loop {
             let r = match recv.try_recv() {
@@ -53,8 +52,7 @@ impl Service {
                     }
                 }
             });
-            join_all(handles)
-                .await
+            handles
                 .into_iter()
                 .collect::<Result<(), _>>()
                 .map_err(|e| {
