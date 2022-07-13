@@ -1,9 +1,9 @@
 use crate::consumer::RequestConsumer;
 use crate::model::Request;
+
 use anyhow::Result;
 use async_trait::async_trait;
-use futures::{stream, TryStreamExt};
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
+use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
 use kafka::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +13,7 @@ use tracing::{debug, info};
 use super::config::Config;
 
 pub struct KafkaRequestConsumer {
-    consumer: Consumer,
+    consumer: Arc<Mutex<Consumer>>,
     consuming_delay: Duration,
 }
 
@@ -37,7 +37,7 @@ impl KafkaRequestConsumer {
 
         let consumer = consumer.create()?;
         Ok(Self {
-            consumer,
+            consumer: Arc::new(Mutex::new(consumer)),
             consuming_delay: cfg.consuming_delay.into(),
         })
     }
@@ -49,8 +49,7 @@ impl RequestConsumer for KafkaRequestConsumer {
         info!("starting fetching updates from kafka");
 
         loop {
-            let consumer = Arc::new(Mutex::new(&mut self.consumer));
-            let consumer = consumer.clone();
+            let consumer = self.consumer.clone();
 
             debug!("fetching messagesets");
 
@@ -62,43 +61,41 @@ impl RequestConsumer for KafkaRequestConsumer {
                 }
             };
 
-            let stream = stream::iter(mss.iter().map::<Result<MessageSet>, _>(Ok));
+            let mut consumer = consumer.lock().await;
 
-            stream
-                .try_for_each(|ms| async {
-                    let fs = ms
-                        .messages()
-                        .iter()
-                        .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
-                            Ok(r) => Some(r),
-                            Err(e) => {
-                                tracing::error!("failed to deserialize requests: {:?}", e);
-                                None
-                            }
-                        })
-                        .flatten()
-                        .map(|req| out.send(req))
-                        .collect::<Vec<_>>();
+            mss.iter().try_for_each(|ms| {
+                ms.messages()
+                    .iter()
+                    .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
+                        Ok(r) => Some(r),
+                        Err(e) => {
+                            tracing::error!("failed to deserialize requests: {:?}", e);
+                            None
+                        }
+                    })
+                    .flatten()
+                    .map(|req| out.blocking_send(req).map_err(|e| anyhow::anyhow!(e)))
+                    .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
-                    futures::future::try_join_all(fs).await?;
+                consumer
+                    .consume_messageset(ms)
+                    .map_err(|e| anyhow::anyhow!(e))
+            })?;
 
-                    consumer
-                        .lock()
-                        .await
-                        .consume_messageset(ms)
-                        .map_err(|e| e.into())
-                })
-                .await?;
+            debug!("commiting consumed");
 
-            debug!("messagesets consumed");
-
-            if let Err(e) = consumer.lock().await.commit_consumed() {
+            if let Err(e) = consumer.commit_consumed() {
                 tracing::error!("failed to commit consumed: {:?}", e);
             };
 
-            debug!("messagesets sucessfully consumed");
+            debug!(
+                "messagesets sucessfully consumed, sleep for {:?}",
+                self.consuming_delay
+            );
 
             tokio::time::sleep(self.consuming_delay).await;
+
+            debug!("sleeped for {:?}", self.consuming_delay);
         }
     }
 }

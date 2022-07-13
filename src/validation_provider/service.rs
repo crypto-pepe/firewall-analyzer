@@ -1,4 +1,4 @@
-use futures::future::join_all;
+use futures::future::try_join_all;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -53,14 +53,11 @@ impl Service {
                     }
                 }
             });
-            join_all(handles)
-                .await
-                .into_iter()
-                .collect::<Result<(), _>>()
-                .map_err(|e| {
-                    tracing::error!("{:?}", e);
-                    ProcessingError::ChannelUnavailable(e)
-                })?;
+
+            try_join_all(handles).await.map_err(|e| {
+                tracing::error!("{:?}", e);
+                ProcessingError::ChannelUnavailable(e)
+            })?;
         }
     }
 }
