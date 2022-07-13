@@ -41,9 +41,8 @@ impl KafkaRequestConsumer {
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
     async fn run(&mut self, out: mpsc::UnboundedSender<Request>) -> Result<()> {
+        let consumer = Arc::new(Mutex::new(&mut self.consumer));
         loop {
-            let consumer = Arc::new(Mutex::new(&mut self.consumer));
-            let consumer = consumer.clone();
             let mss = match consumer.lock().await.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
