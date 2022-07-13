@@ -5,6 +5,7 @@ kafka:
     - 'some-topic'
   group: 'some-group'
   client_id: 'some-client'
+  consuming_delay: 1s
 forwarder:
   ban_target_url: "http://localhost:8001/api/bans"
   retry_count: 3

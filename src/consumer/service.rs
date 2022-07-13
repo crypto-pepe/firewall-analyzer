@@ -5,42 +5,55 @@ use async_trait::async_trait;
 use futures::{stream, TryStreamExt};
 use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
 use kafka::Error;
-use pepe_config::kafka::consumer::Config;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
+use tracing::{debug, info};
+
+use super::config::Config;
 
 pub struct KafkaRequestConsumer {
     consumer: Consumer,
+    consuming_delay: Duration,
 }
 
 impl KafkaRequestConsumer {
     pub fn new(cfg: &Config) -> Result<Self, Error> {
-        let mut consumer = Consumer::from_hosts(cfg.brokers.clone())
-            .with_fallback_offset(FetchOffset::Earliest)
+        let mut consumer = Consumer::from_hosts(cfg.consumer.brokers.clone())
+            .with_fallback_offset(FetchOffset::Latest)
             .with_offset_storage(GroupOffsetStorage::Kafka)
-            .with_client_id(cfg.client_id.clone())
-            .with_group(cfg.group.clone());
+            .with_client_id(cfg.consumer.client_id.clone())
+            .with_group(cfg.consumer.group.clone());
 
-        if let Some(t) = cfg.ack_timeout {
+        if let Some(t) = cfg.consumer.ack_timeout {
             consumer = consumer.with_fetch_max_wait_time(t.into());
         }
 
         consumer = cfg
+            .consumer
             .topics
             .iter()
             .fold(consumer, |c, t| c.with_topic(t.to_string()));
 
         let consumer = consumer.create()?;
-        Ok(Self { consumer })
+        Ok(Self {
+            consumer,
+            consuming_delay: cfg.consuming_delay.into(),
+        })
     }
 }
 
 #[async_trait]
 impl RequestConsumer for KafkaRequestConsumer {
     async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<()> {
+        info!("starting fetching updates from kafka");
+
         loop {
             let consumer = Arc::new(Mutex::new(&mut self.consumer));
             let consumer = consumer.clone();
+
+            debug!("fetching messagesets");
+
             let mss = match consumer.lock().await.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
@@ -79,6 +92,10 @@ impl RequestConsumer for KafkaRequestConsumer {
             if let Err(e) = consumer.lock().await.commit_consumed() {
                 tracing::error!("{:?}", e);
             };
+
+            debug!("messagesets sucessfully consumed");
+
+            tokio::time::sleep(self.consuming_delay).await;
         }
     }
 }

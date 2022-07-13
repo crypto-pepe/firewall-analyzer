@@ -5,7 +5,10 @@ use tokio::sync::mpsc;
 
 pub use self::service::KafkaRequestConsumer;
 
+mod config;
 mod service;
+
+pub use config::Config;
 
 #[async_trait]
 pub trait RequestConsumer {

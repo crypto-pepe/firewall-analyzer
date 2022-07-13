@@ -2,6 +2,7 @@ use std::iter::Take;
 
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
+use tracing::info;
 
 use crate::forwarder::config::Config;
 use crate::model::ValidatorBanRequest;
@@ -31,6 +32,8 @@ impl Service {
         loop {
             match recv.try_recv() {
                 Ok(validator_ban_request) => {
+                    info!("emit ban request: {:?}", validator_ban_request);
+
                     let analyzer_id = format!(
                         "{}:{}",
                         self.analyzer_id, validator_ban_request.validator_name
