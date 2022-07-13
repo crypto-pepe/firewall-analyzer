@@ -3,8 +3,9 @@ use crate::model::Request;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
+use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
 use kafka::Error;
+use futures::{stream, TryStreamExt};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
