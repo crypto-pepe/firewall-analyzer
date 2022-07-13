@@ -19,6 +19,7 @@ pub fn get_subscriber(cfg: &Config) -> Box<dyn Subscriber + Send + Sync> {
         let tracer = init_tracer(cfg.svc_name.to_string(), ep.into());
         return Box::new(reg.with(tracing_opentelemetry::layer().with_tracer(tracer)));
     }
+
     Box::new(reg)
 }
 

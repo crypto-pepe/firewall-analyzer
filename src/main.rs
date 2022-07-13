@@ -1,5 +1,6 @@
 use tokio::io;
 use tokio::sync::mpsc;
+use tracing::{error, info};
 
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
@@ -15,14 +16,14 @@ mod validators;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    tracing::info!("start application");
+    info!("start application");
 
     let cfg = match config::Config::load() {
         Ok(a) => a,
         Err(e) => panic!("can't read config {:?}", e),
     };
 
-    tracing::info!("config loaded; config={:?}", &cfg);
+    info!("config loaded; config={:?}", &cfg);
 
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
@@ -64,7 +65,7 @@ async fn main() -> io::Result<()> {
             if let Err(e) = res {
                 tracing::error!("request consumer failed: {:?}", e);
             } else  {
-                tracing::info!("request consumer finished")
+                info!("request consumer finished");
             }
         },
 

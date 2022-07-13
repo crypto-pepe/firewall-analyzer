@@ -1,9 +1,9 @@
 use crate::consumer::RequestConsumer;
 use crate::model::Request;
+
 use anyhow::Result;
 use async_trait::async_trait;
-use futures::{stream, TryStreamExt};
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage, MessageSet};
+use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
 use kafka::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,7 +13,7 @@ use tracing::{debug, info};
 use super::config::Config;
 
 pub struct KafkaRequestConsumer {
-    consumer: Consumer,
+    consumer: Arc<Mutex<Consumer>>,
     consuming_delay: Duration,
 }
 
@@ -37,7 +37,7 @@ impl KafkaRequestConsumer {
 
         let consumer = consumer.create()?;
         Ok(Self {
-            consumer,
+            consumer: Arc::new(Mutex::new(consumer)),
             consuming_delay: cfg.consuming_delay.into(),
         })
     }
@@ -49,8 +49,7 @@ impl RequestConsumer for KafkaRequestConsumer {
         info!("starting fetching updates from kafka");
 
         loop {
-            let consumer = Arc::new(Mutex::new(&mut self.consumer));
-            let consumer = consumer.clone();
+            let consumer = self.consumer.clone();
 
             debug!("fetching messagesets");
 
