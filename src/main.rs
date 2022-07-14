@@ -41,7 +41,8 @@ async fn main() -> io::Result<()> {
     let (s, r) = mpsc::channel(5);
     let (fs, fr) = mpsc::channel::<model::ValidatorBanRequest>(5);
 
-    let request_consumer_handle = tokio::spawn(async move { kafka_request_consumer.run(s).await });
+    let request_consumer_handle =
+        tokio::task::spawn_blocking(move || kafka_request_consumer.run(s));
 
     let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})

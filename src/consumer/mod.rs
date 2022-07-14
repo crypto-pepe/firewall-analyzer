@@ -1,13 +1,11 @@
 use crate::model::Request;
-use anyhow::Result;
-use async_trait::async_trait;
 use tokio::sync::mpsc;
 
 pub use self::service::KafkaRequestConsumer;
+use crate::error::Error as AppError;
 
 mod service;
 
-#[async_trait]
 pub trait RequestConsumer {
-    async fn run(&mut self, out: mpsc::Sender<Request>) -> Result<()>;
+    fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), AppError>;
 }
