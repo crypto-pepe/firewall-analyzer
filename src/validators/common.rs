@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use pepe_config::DurationString;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct BanRuleConfig {
     pub limit: u64,
-    pub ban_duration: duration_string::DurationString,
-    pub reset_duration: duration_string::DurationString,
+    pub ban_duration: DurationString,
+    pub reset_duration: DurationString,
 }
 
 #[derive(Copy, Clone)]

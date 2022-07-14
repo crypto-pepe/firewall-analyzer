@@ -1,11 +1,11 @@
 use pepe_config::{ConfigError, FileFormat};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::{forwarder, telemetry, validation_provider};
+use crate::{consumer, forwarder, telemetry, validation_provider};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Config {
-    pub kafka: pepe_config::kafka::consumer::Config,
+    pub kafka: consumer::Config,
     pub analyzer_id: String,
     pub forwarder: forwarder::config::Config,
     pub telemetry: telemetry::Config,

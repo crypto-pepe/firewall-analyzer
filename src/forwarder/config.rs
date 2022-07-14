@@ -1,6 +1,7 @@
-use crate::forwarder::http_client;
-use duration_string::DurationString;
+use pepe_config::DurationString;
 use serde::{Deserialize, Serialize};
+
+use crate::forwarder::http_client;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
