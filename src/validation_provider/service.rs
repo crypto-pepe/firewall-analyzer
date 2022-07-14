@@ -1,7 +1,6 @@
 use futures::future::try_join_all;
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::error::ProcessingError;
 use crate::model;
@@ -25,18 +24,9 @@ impl Service {
         info!("starting validators provider");
 
         loop {
-            let r = match request_stream.try_recv() {
-                Ok(r) => {
-                    debug!("got request to analyze");
-                    r
-                }
-                Err(e) => match e {
-                    TryRecvError::Empty => continue,
-                    TryRecvError::Disconnected => {
-                        tracing::error!("{:?}", e);
-                        return Err(ProcessingError::ChannelDisconnected(e));
-                    }
-                },
+            let r = match request_stream.recv().await {
+                Some(r) => r,
+                _ => continue,
             };
 
             let fs = self

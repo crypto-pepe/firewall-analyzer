@@ -1,6 +1,4 @@
 use std::iter::Take;
-
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
@@ -32,8 +30,8 @@ impl Service {
         info!("starting forwarder");
 
         loop {
-            match recv.try_recv() {
-                Ok(validator_ban_request) => {
+            match recv.recv().await {
+                Some(validator_ban_request) => {
                     debug!("got ban request: {:?}", validator_ban_request);
 
                     let analyzer_id = format!(
@@ -52,10 +50,7 @@ impl Service {
                         tracing::error!("{:?}", e)
                     }
                 }
-                Err(e) => match e {
-                    TryRecvError::Empty => (),
-                    TryRecvError::Disconnected => break,
-                },
+                _ => (),
             }
         }
     }
