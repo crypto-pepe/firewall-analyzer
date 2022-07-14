@@ -34,11 +34,11 @@ validators:
           cost: 5
         - method: "POST"
           path_regex: "/api/upload"
-          body_regex: ".{128, }"
+          body_regex: ".{128,}"
           cost: 10
         - method: "POST"
           path_regex: "/api/upload"
-          body_regex: ".{,127}"
+          body_regex: ".{0,127}"
           cost: 5
       default_cost: 5
   - requests_from_ip_counter:
