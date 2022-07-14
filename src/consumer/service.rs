@@ -21,7 +21,7 @@ pub struct KafkaRequestConsumer {
 impl KafkaRequestConsumer {
     pub fn new(cfg: &Config) -> Result<Self, Error> {
         let mut consumer = Consumer::from_hosts(cfg.kafka.brokers.clone())
-            .with_fallback_offset(FetchOffset::Earliest)
+            .with_fallback_offset(FetchOffset::Latest)
             .with_offset_storage(GroupOffsetStorage::Kafka)
             .with_client_id(cfg.kafka.client_id.clone())
             .with_group(cfg.kafka.group.clone());
