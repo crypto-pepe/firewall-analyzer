@@ -1,5 +1,6 @@
 use tokio::io;
 use tokio::sync::mpsc;
+use tracing::{error, info};
 
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
@@ -15,35 +16,22 @@ mod validators;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    tracing::info!("start application");
+    info!("starting application");
 
     let cfg = match config::Config::load() {
         Ok(a) => a,
         Err(e) => panic!("can't read config {:?}", e),
     };
 
-    tracing::info!("config loaded; config={:?}", &cfg);
+    info!("config loaded: {:?}", &cfg);
 
     let subscriber = telemetry::get_subscriber(&cfg.telemetry);
     telemetry::init_subscriber(subscriber);
 
-    let mut kafka_request_consumer =
-        KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
-
-    let validators = cfg
-        .validators
-        .into_iter()
-        .map(validation_provider::get_validator)
-        .collect::<Result<Vec<_>, _>>()
-        .expect("setup validators");
-    let mut validator_svc = validation_provider::service::Service::from_validators(validators);
-
     let (request_sink, request_stream) = mpsc::channel(5);
     let (ban_request_sink, ban_request_stream) = mpsc::channel::<model::ValidatorBanRequest>(5);
 
-    let request_consumer_handle =
-        tokio::task::spawn_blocking(move || kafka_request_consumer.run(request_sink));
-
+    // forwarder
     let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
     } else {
@@ -58,29 +46,48 @@ async fn main() -> io::Result<()> {
 
     let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(ban_request_stream).await });
 
+    // validators
+    let validators = cfg
+        .validators
+        .into_iter()
+        .map(validation_provider::get_validator)
+        .collect::<Result<Vec<_>, _>>()
+        .expect("setup validators");
+    let mut validator_svc = validation_provider::service::Service::from_validators(validators);
+
     let validator_handle =
         tokio::spawn(async move { validator_svc.run(request_stream, ban_request_sink).await });
+
+    // request consumer
+    let mut kafka_request_consumer =
+        KafkaRequestConsumer::new(&cfg.kafka).expect("kafka request consumer");
+
+    let request_consumer_handle =
+        tokio::task::spawn_blocking(move || kafka_request_consumer.run(request_sink));
 
     tokio::select! {
         res = request_consumer_handle => {
             if let Err(e) = res {
-                tracing::error!("{:?}", e)
+                error!("request consumer failed: {:?}", e)
             } else  {
-                tracing::info!("request consumer finished")
+                info!("request consumer finished")
             }
         },
 
-        _ = forwarder_handle => {
-             tracing::info!("forwarder finished")
+        res = forwarder_handle => {
+          if let Err(e) = res {
+            error!("forwarder failed: {:?}", e);
+        } else  {
+            info!("forwarder provider finished");
+        }
         },
 
         res = validator_handle => {
             if let Err(e) = res {
-                tracing::error!("{:?}", e)
+                error!("validator failed: {:?}", e)
             } else  {
-                tracing::info!("validator provider finished")
+                info!("validator provider finished")
             }
-
         }
     }
 
