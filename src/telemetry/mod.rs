@@ -3,15 +3,23 @@ use tracing::subscriber::set_global_default;
 use tracing::Subscriber;
 use tracing_log::LogTracer;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::Layer;
 use tracing_subscriber::{fmt::Layer as FmtLayer, EnvFilter, Registry};
 
 pub mod config;
 pub use self::config::Config;
+use self::config::LogsFormat;
 
 pub fn get_subscriber(cfg: &Config) -> Box<dyn Subscriber + Send + Sync> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let fmt_layer = FmtLayer::default();
+    let fmt_layer = match &cfg.format {
+        LogsFormat::Compact => fmt_layer.compact().boxed(),
+        LogsFormat::Pretty => fmt_layer.pretty().boxed(),
+        LogsFormat::Json => fmt_layer.json().boxed(),
+        LogsFormat::Full => fmt_layer.boxed(),
+    };
 
     let reg = Registry::default().with(env_filter).with(fmt_layer);
 

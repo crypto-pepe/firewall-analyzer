@@ -6,7 +6,8 @@ kafka:
   group: 'some-group'
   client_id: 'some-client'
 forwarder:
-  ban_target_url: "http://localhost:8001/api/bans"
+  ban_target_urls: 
+    - "http://localhost:8001/api/bans"
   retry_count: 3
   retry_interval: 3s
 analyzer_id: "analyzer-1"
@@ -70,3 +71,4 @@ validators:
         - '.*wget.*'
 telemetry:
   svc_name: "firewall-analyzer"
+  format: json

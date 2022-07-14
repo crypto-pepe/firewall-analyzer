@@ -1,6 +1,7 @@
 use futures::future::try_join_all;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::info;
+use tracing::{error, info};
+use valuable::Valuable;
 
 use crate::error::ProcessingError;
 use crate::model;
@@ -24,36 +25,38 @@ impl Service {
         info!("starting validators provider");
 
         loop {
-            let r = match request_stream.recv().await {
-                Some(r) => r,
-                _ => continue,
-            };
-
-            let fs = self
-                .validators
-                .iter_mut()
-                .filter_map(|v| match v.validate(r.clone()) {
-                    Ok(obr) => match obr {
-                        Some(validator_ban_request) => {
-                            let ban_request = ValidatorBanRequest {
-                                ban_request: validator_ban_request,
-                                validator_name: v.name(),
-                            };
-                            tracing::info!("ban: {:?}", ban_request);
-                            Some(ban_sink.send(ban_request))
+            if let Some(r) = request_stream.recv().await {
+                let fs = self
+                    .validators
+                    .iter_mut()
+                    .filter_map(|v| match v.validate(r.clone()) {
+                        Ok(obr) => match obr {
+                            Some(validator_ban_request) => {
+                                let ban_request = ValidatorBanRequest {
+                                    ban_request: validator_ban_request,
+                                    validator_name: v.name(),
+                                };
+                                info!(
+                                    log = "target reached the limits, ban",
+                                    ban_request = ban_request.as_value()
+                                );
+                                Some(ban_sink.send(ban_request))
+                            }
+                            None => None,
+                        },
+                        Err(e) => {
+                            error!("{:?}", e);
+                            None
                         }
-                        None => None,
-                    },
-                    Err(e) => {
-                        tracing::error!("{:?}", e);
-                        None
-                    }
-                });
+                    });
 
-            try_join_all(fs).await.map_err(|e| {
-                tracing::error!("{:?}", e);
-                ProcessingError::ChannelUnavailable(e)
-            })?;
+                try_join_all(fs).await.map_err(|e| {
+                    error!("{:?}", e);
+                    ProcessingError::ChannelUnavailable(e)
+                })?;
+            } else {
+                return Err(ProcessingError::<ValidatorBanRequest>::ChannelClosed);
+            }
         }
     }
 }

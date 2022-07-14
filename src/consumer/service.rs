@@ -1,10 +1,9 @@
+use anyhow::Result;
+use kafka::consumer::{Consumer, FetchOffset};
+use kafka::Error;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
-
-use anyhow::Result;
-use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
-use kafka::Error;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
@@ -22,7 +21,6 @@ impl KafkaRequestConsumer {
     pub fn new(cfg: &Config) -> Result<Self, Error> {
         let mut consumer = Consumer::from_hosts(cfg.kafka.brokers.clone())
             .with_fallback_offset(FetchOffset::Latest)
-            .with_offset_storage(GroupOffsetStorage::Kafka)
             .with_client_id(cfg.kafka.client_id.clone())
             .with_group(cfg.kafka.group.clone());
 
@@ -37,6 +35,7 @@ impl KafkaRequestConsumer {
             .fold(consumer, |c, t| c.with_topic(t.to_string()));
 
         let consumer = consumer.create()?;
+
         Ok(Self {
             consumer,
             consuming_delay: cfg.consuming_delay.into(),
@@ -95,12 +94,6 @@ impl RequestConsumer for KafkaRequestConsumer {
 
                     Result::<(), AppError>::Ok(())
                 })?;
-
-                debug!("commiting consumed");
-
-                if let Err(e) = self.consumer.commit_consumed() {
-                    tracing::error!("failed to commit consumed: {:?}", e);
-                };
             }
         }
     }

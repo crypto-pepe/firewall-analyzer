@@ -1,6 +1,6 @@
 use tokio::io;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::consumer::{KafkaRequestConsumer, RequestConsumer};
 use crate::forwarder::ExecutorClient;
@@ -68,23 +68,23 @@ async fn main() -> io::Result<()> {
     tokio::select! {
         res = request_consumer_handle => {
             if let Err(e) = res {
-                error!("request consumer failed: {:?}", e)
+                panic!("request consumer failed: {:?}", e)
             } else  {
                 info!("request consumer finished")
             }
         },
 
         res = forwarder_handle => {
-          if let Err(e) = res {
-            error!("forwarder failed: {:?}", e);
-        } else  {
-            info!("forwarder provider finished");
-        }
+            if let Err(e) = res {
+                panic!("forwarder failed: {:?}", e)
+            } else  {
+                info!("forwarder provider finished");
+            }
         },
 
         res = validator_handle => {
             if let Err(e) = res {
-                error!("validator failed: {:?}", e)
+                panic!("validator failed: {:?}", e)
             } else  {
                 info!("validator provider finished")
             }
