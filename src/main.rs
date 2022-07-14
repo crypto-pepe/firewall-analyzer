@@ -38,11 +38,11 @@ async fn main() -> io::Result<()> {
         .expect("setup validators");
     let mut validator_svc = validation_provider::service::Service::from_validators(validators);
 
-    let (s, r) = mpsc::channel(5);
-    let (fs, fr) = mpsc::channel::<model::ValidatorBanRequest>(5);
+    let (request_sink, request_stream) = mpsc::channel(5);
+    let (ban_request_sink, ban_request_stream) = mpsc::channel::<model::ValidatorBanRequest>(5);
 
     let request_consumer_handle =
-        tokio::task::spawn_blocking(move || kafka_request_consumer.run(s));
+        tokio::task::spawn_blocking(move || kafka_request_consumer.run(request_sink));
 
     let executor_client: Box<dyn ExecutorClient + Send + Sync> = if cfg.dry_run {
         Box::new(forwarder::NoopClient {})
@@ -56,9 +56,10 @@ async fn main() -> io::Result<()> {
     let forwarder_svc =
         forwarder::service::Service::new(executor_client, cfg.forwarder, cfg.analyzer_id);
 
-    let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(fr).await });
+    let forwarder_handle = tokio::spawn(async move { forwarder_svc.run(ban_request_stream).await });
 
-    let validator_handle = tokio::spawn(async move { validator_svc.run(r, fs).await });
+    let validator_handle =
+        tokio::spawn(async move { validator_svc.run(request_stream, ban_request_sink).await });
 
     tokio::select! {
         res = request_consumer_handle => {

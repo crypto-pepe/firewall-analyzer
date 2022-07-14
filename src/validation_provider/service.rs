@@ -1,6 +1,7 @@
-use futures::future::join_all;
+use futures::future::try_join_all;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::{debug, info};
 
 use crate::error::ProcessingError;
 use crate::model;
@@ -18,12 +19,17 @@ impl Service {
 
     pub async fn run(
         &mut self,
-        mut recv: Receiver<model::Request>,
-        send: Sender<ValidatorBanRequest>,
+        mut request_stream: Receiver<model::Request>,
+        ban_sink: Sender<ValidatorBanRequest>,
     ) -> Result<(), ProcessingError<ValidatorBanRequest>> {
+        info!("starting validators provider");
+
         loop {
-            let r = match recv.try_recv() {
-                Ok(r) => r,
+            let r = match request_stream.try_recv() {
+                Ok(r) => {
+                    debug!("got request to analyze");
+                    r
+                }
                 Err(e) => match e {
                     TryRecvError::Empty => continue,
                     TryRecvError::Disconnected => {
@@ -33,9 +39,10 @@ impl Service {
                 },
             };
 
-            let handles = self.validators.iter_mut().filter_map(|v| {
-                let res = v.validate(r.clone());
-                match res {
+            let fs = self
+                .validators
+                .iter_mut()
+                .filter_map(|v| match v.validate(r.clone()) {
                     Ok(obr) => match obr {
                         Some(validator_ban_request) => {
                             let ban_request = ValidatorBanRequest {
@@ -43,7 +50,7 @@ impl Service {
                                 validator_name: v.name(),
                             };
                             tracing::info!("ban: {:?}", ban_request);
-                            Some(send.send(ban_request))
+                            Some(ban_sink.send(ban_request))
                         }
                         None => None,
                     },
@@ -51,16 +58,12 @@ impl Service {
                         tracing::error!("{:?}", e);
                         None
                     }
-                }
-            });
-            join_all(handles)
-                .await
-                .into_iter()
-                .collect::<Result<(), _>>()
-                .map_err(|e| {
-                    tracing::error!("{:?}", e);
-                    ProcessingError::ChannelUnavailable(e)
-                })?;
+                });
+
+            try_join_all(fs).await.map_err(|e| {
+                tracing::error!("{:?}", e);
+                ProcessingError::ChannelUnavailable(e)
+            })?;
         }
     }
 }

@@ -6,7 +6,7 @@ use anyhow::Result;
 use kafka::consumer::{Consumer, FetchOffset, GroupOffsetStorage};
 use kafka::Error;
 use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use super::Config;
 use crate::consumer::RequestConsumer;
@@ -46,7 +46,11 @@ impl KafkaRequestConsumer {
 
 impl RequestConsumer for KafkaRequestConsumer {
     fn run(&mut self, out: mpsc::Sender<Request>) -> Result<(), AppError> {
+        info!("starting kafka consuming");
+
         loop {
+            debug!("fetching message sets");
+
             let mss = match self.consumer.poll() {
                 Ok(mss) => mss,
                 Err(e) => {
@@ -62,8 +66,12 @@ impl RequestConsumer for KafkaRequestConsumer {
                 );
                 sleep(self.consuming_delay);
             } else {
+                debug!("fetched some message sets");
+
                 mss.iter().try_for_each(|ms| {
-                    ms.messages()
+                    let messages = ms.messages();
+
+                    messages
                         .iter()
                         .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
                             Ok(r) => Some(r),
@@ -77,10 +85,18 @@ impl RequestConsumer for KafkaRequestConsumer {
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|e| AppError::ChannelSend(e.to_string()))?;
 
+                    debug!("handled {} messages", messages.len());
+
                     self.consumer
                         .consume_messageset(ms)
-                        .map_err(|e| AppError::Kafka(Arc::new(e)))
+                        .map_err(|e| AppError::Kafka(Arc::new(e)))?;
+
+                    debug!("consumed message set");
+
+                    Result::<(), AppError>::Ok(())
                 })?;
+
+                debug!("commiting consumed");
 
                 if let Err(e) = self.consumer.commit_consumed() {
                     tracing::error!("failed to commit consumed: {:?}", e);
