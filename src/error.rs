@@ -6,7 +6,7 @@ use tokio::sync::mpsc::error::{SendError, TryRecvError};
 pub enum ProcessingError<T> {
     #[error(transparent)]
     ChannelUnavailable(#[from] SendError<T>),
-    
+
     #[error(transparent)]
     ChannelDisconnected(#[from] TryRecvError),
 

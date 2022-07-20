@@ -39,6 +39,7 @@ Example:
 
 
 # Validators
+In all validators each consequent limit has to be greater than previous
 
 ### dummy (testing validator)
 
