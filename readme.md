@@ -39,6 +39,7 @@ Example:
 
 
 # Validators
+In all validators each consequent ban duration has to be greater than previous and not greater, than corresponding reset duration
 
 ### dummy (testing validator)
 

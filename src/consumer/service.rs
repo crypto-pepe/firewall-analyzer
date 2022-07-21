@@ -1,16 +1,18 @@
-use anyhow::Result;
-use kafka::consumer::{Consumer, FetchOffset};
-use kafka::Error;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
+
+use anyhow::Result;
+use kafka::consumer::{Consumer, FetchOffset};
+use kafka::Error;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use super::Config;
 use crate::consumer::RequestConsumer;
 use crate::error::Error as AppError;
 use crate::model::Request;
+
+use super::Config;
 
 pub struct KafkaRequestConsumer {
     consumer: Consumer,
@@ -54,7 +56,7 @@ impl RequestConsumer for KafkaRequestConsumer {
                 Ok(mss) => mss,
                 Err(e) => {
                     error!("failed to fetch message sets: {:?}", e);
-                    continue;
+                    return Err(AppError::Kafka(Arc::new(e)));
                 }
             };
 
@@ -70,21 +72,23 @@ impl RequestConsumer for KafkaRequestConsumer {
                 mss.iter().try_for_each(|ms| {
                     let messages = ms.messages();
 
-                    messages
+                    match messages
                         .iter()
                         .filter_map(|m| match serde_json::from_slice::<Vec<Request>>(m.value) {
                             Ok(r) => Some(r),
                             Err(e) => {
-                                tracing::error!("failed to deserialize requests: {:?}", e);
+                                error!("failed to deserialize requests: {:?}", e);
                                 None
                             }
                         })
                         .flatten()
                         .map(|req| out.blocking_send(req))
                         .collect::<Result<Vec<_>, _>>()
-                        .map_err(|e| AppError::ChannelSend(e.to_string()))?;
-
-                    debug!("handled {} messages", messages.len());
+                        .map_err(|e| AppError::ChannelSend(e.to_string()))
+                    {
+                        Ok(_) => debug!("handled {} messages", messages.len()),
+                        Err(e) => error!("can't process messages {:?}", e),
+                    };
 
                     self.consumer
                         .consume_messageset(ms)

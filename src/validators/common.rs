@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
+use pepe_config::DurationString;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use pepe_config::DurationString;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
